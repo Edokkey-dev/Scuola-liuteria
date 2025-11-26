@@ -1,46 +1,64 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import hashlib
+import psycopg2
 from datetime import datetime, date
 
 # --- CONFIGURAZIONE ---
 ADMIN_KEY = "Francescorussoascoltaultimo"
-DB_FILE = "scuola.db"
 
-# --- DATABASE ---
-# Usiamo una funzione per connetterci ogni volta ed evitare errori di thread
+# --- GESTIONE CONNESSIONE DATABASE (SUPABASE/POSTGRES) ---
 def get_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
+    """
+    Si connette al database usando i dati salvati nei 'Secrets' di Streamlit.
+    """
+    # Recupera la URL dai Secrets di Streamlit
+    db_url = st.secrets["postgres"]["url"]
+    return psycopg2.connect(db_url)
 
 def init_db():
+    """
+    Crea le tabelle se non esistono (Sintassi PostgreSQL).
+    """
     conn = get_connection()
     c = conn.cursor()
-    # Tabella Utenti
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY, password TEXT, role TEXT)''')
     
-    # Tabella Prenotazioni
-    c.execute('''CREATE TABLE IF NOT EXISTS bookings
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  username TEXT, 
-                  booking_date DATE, 
-                  slot TEXT,
-                  lesson_number INTEGER)''')
+    # Tabella Utenti
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+                 username TEXT PRIMARY KEY, 
+                 password TEXT, 
+                 role TEXT
+                 )''')
+    
+    # Tabella Prenotazioni (SERIAL è l'autoincrement di Postgres)
+    c.execute('''CREATE TABLE IF NOT EXISTS bookings (
+                 id SERIAL PRIMARY KEY, 
+                 username TEXT, 
+                 booking_date DATE, 
+                 slot TEXT,
+                 lesson_number INTEGER
+                 )''')
+    
     conn.commit()
     conn.close()
 
-# Inizializza il DB all'avvio
-init_db()
+# Inizializziamo il DB appena parte l'app
+# (In produzione si farebbe una volta sola, ma qui è per sicurezza)
+try:
+    init_db()
+except Exception as e:
+    st.error(f"Errore connessione database: {e}")
 
-# --- FUNZIONI DI UTILITÀ ---
+# --- FUNZIONI UTILI ---
+
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def verify_user(username, password):
     conn = get_connection()
     c = conn.cursor()
-    c.execute('SELECT role FROM users WHERE username = ? AND password = ?', 
+    # In Postgres si usa %s come placeholder
+    c.execute('SELECT role FROM users WHERE username = %s AND password = %s', 
               (username, hash_password(password)))
     data = c.fetchone()
     conn.close()
@@ -50,36 +68,41 @@ def add_user(username, password, role):
     conn = get_connection()
     c = conn.cursor()
     try:
-        c.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', 
+        c.execute('INSERT INTO users (username, password, role) VALUES (%s, %s, %s)', 
                   (username, hash_password(password), role))
         conn.commit()
         conn.close()
         return True
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         conn.close()
+        return False # Utente duplicato
+    except Exception as e:
+        conn.close()
+        st.error(e)
         return False
 
 def calculate_next_lesson_number(username):
     conn = get_connection()
     c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM bookings WHERE username = ?', (username,))
+    c.execute('SELECT COUNT(*) FROM bookings WHERE username = %s', (username,))
     count = c.fetchone()[0]
     conn.close()
-    # Ciclo 1-8
     return (count % 8) + 1
 
 def add_booking(username, booking_date, slot):
     conn = get_connection()
     c = conn.cursor()
+    
     # Controllo duplicati
-    c.execute('SELECT * FROM bookings WHERE username=? AND booking_date=? AND slot=?', (username, booking_date, slot))
+    c.execute('SELECT * FROM bookings WHERE username=%s AND booking_date=%s AND slot=%s', 
+              (username, booking_date, slot))
     if c.fetchone():
         conn.close()
         return False, "Esiste già una prenotazione per questo orario."
     
     lesson_num = calculate_next_lesson_number(username)
     
-    c.execute('INSERT INTO bookings (username, booking_date, slot, lesson_number) VALUES (?, ?, ?, ?)', 
+    c.execute('INSERT INTO bookings (username, booking_date, slot, lesson_number) VALUES (%s, %s, %s, %s)', 
               (username, booking_date, slot, lesson_num))
     conn.commit()
     conn.close()
@@ -88,7 +111,7 @@ def add_booking(username, booking_date, slot):
 def get_my_bookings(username):
     conn = get_connection()
     c = conn.cursor()
-    c.execute('SELECT id, booking_date, slot, lesson_number FROM bookings WHERE username = ? ORDER BY booking_date', (username,))
+    c.execute('SELECT id, booking_date, slot, lesson_number FROM bookings WHERE username = %s ORDER BY booking_date', (username,))
     data = c.fetchall()
     conn.close()
     return data
@@ -104,14 +127,13 @@ def get_all_bookings_admin():
 def delete_booking(booking_id):
     conn = get_connection()
     c = conn.cursor()
-    c.execute('DELETE FROM bookings WHERE id = ?', (booking_id,))
+    c.execute('DELETE FROM bookings WHERE id = %s', (booking_id,))
     conn.commit()
     conn.close()
 
-# --- INTERFACCIA UTENTE ---
-st.set_page_config(page_title="Gestione Scuola", layout="centered")
+# --- INTERFACCIA STREAMLIT (Identica a prima) ---
 
-# Titolo principale
+st.set_page_config(page_title="Gestione Scuola", layout="centered")
 st.title("📚 Portale Prenotazioni Scuola")
 
 # Gestione Sessione
@@ -120,132 +142,104 @@ if 'logged_in' not in st.session_state:
     st.session_state['username'] = ''
     st.session_state['role'] = ''
 
-# --- LOGICA DI NAVIGAZIONE ---
-
 if not st.session_state['logged_in']:
-    # Menu a schede per Login/Registrazione (più pulito)
     tab1, tab2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
 
     with tab1:
-        st.subheader("Accedi al tuo account")
-        # Usiamo st.form per abilitare il salvataggio password del browser
+        st.subheader("Accedi")
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type='password')
             submit_login = st.form_submit_button("Entra")
             
             if submit_login:
-                result = verify_user(username, password)
-                if result:
-                    st.session_state['logged_in'] = True
-                    st.session_state['username'] = username
-                    st.session_state['role'] = result[0]
-                    st.rerun()
-                else:
-                    st.error("Username o Password errati.")
+                # Blocchiamo errori se il DB non è configurato
+                try:
+                    result = verify_user(username, password)
+                    if result:
+                        st.session_state['logged_in'] = True
+                        st.session_state['username'] = username
+                        st.session_state['role'] = result[0]
+                        st.rerun()
+                    else:
+                        st.error("Dati errati.")
+                except Exception as e:
+                    st.error(f"Errore connessione: {e}")
 
     with tab2:
-        st.subheader("Crea un nuovo profilo")
+        st.subheader("Nuovo Profilo")
         with st.form("register_form"):
-            new_user = st.text_input("Scegli un Username")
-            new_pass = st.text_input("Scegli una Password", type='password')
-            
-            # Sezione Admin
+            new_user = st.text_input("Username")
+            new_pass = st.text_input("Password", type='password')
             st.markdown("---")
             is_admin = st.checkbox("Sono il Titolare")
-            admin_code = st.text_input("Codice Segreto (solo per Titolare)", type='password')
-            
+            admin_code = st.text_input("Codice Segreto", type='password')
             submit_register = st.form_submit_button("Crea Account")
 
             if submit_register:
                 role = "student"
                 valid = True
-                
                 if is_admin:
                     if admin_code == ADMIN_KEY:
                         role = "admin"
                     else:
                         valid = False
-                        st.error("Chiave segreta errata!")
+                        st.error("Chiave errata!")
                 
                 if valid and new_user and new_pass:
                     if add_user(new_user, new_pass, role):
-                        st.success("Account creato! Ora vai su 'Accedi' per entrare.")
+                        st.success("Creato! Vai su Accedi.")
                     else:
-                        st.error("Questo Username è già utilizzato.")
+                        st.error("Username occupato.")
                 elif valid:
-                    st.warning("Compila tutti i campi.")
+                    st.warning("Compila tutto.")
 
 else:
-    # --- UTENTE LOGGATO ---
-    
-    # Barra laterale con info utente
     st.sidebar.title(f"Ciao, {st.session_state['username']}")
-    st.sidebar.info(f"Ruolo: {st.session_state['role'].upper()}")
-    
-    if st.sidebar.button("Esci (Logout)"):
+    if st.sidebar.button("Logout"):
         st.session_state['logged_in'] = False
         st.rerun()
 
-    # --- PANNELLO ADMIN ---
     if st.session_state['role'] == 'admin':
-        st.subheader("👑 Registro Prenotazioni")
-        
+        st.subheader("👑 Registro Globale")
         data = get_all_bookings_admin()
         if data:
             df = pd.DataFrame(data, columns=['Studente', 'Data', 'Orario', 'Lezione N°'])
-            # Convertiamo la data in formato leggibile se necessario
-            st.dataframe(
-                df.style.format({"Lezione N°": "{:.0f}"}), 
-                use_container_width=True,
-                height=400
-            )
+            st.dataframe(df.style.format({"Lezione N°": "{:.0f}"}), use_container_width=True)
         else:
-            st.info("Nessuna prenotazione presente nel sistema.")
+            st.info("Nessuna prenotazione.")
 
-    # --- PANNELLO STUDENTE ---
     elif st.session_state['role'] == 'student':
-        # Calcolo prossima lezione
         next_lesson = calculate_next_lesson_number(st.session_state['username'])
         st.metric(label="Prossima Lezione", value=f"N° {next_lesson} di 8")
 
-        # Form Prenotazione
         with st.expander("➕ Nuova Prenotazione", expanded=True):
             with st.form("booking_form"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    d = st.date_input("Data Lezione", min_value=date.today())
+                    d = st.date_input("Data", min_value=date.today())
                 with col2:
-                    slot = st.selectbox("Fascia Oraria", ["10:00 - 13:00", "15:00 - 18:00"])
+                    slot = st.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
                 
-                confirm_btn = st.form_submit_button("Conferma Prenotazione")
-
-                if confirm_btn:
+                if st.form_submit_button("Conferma"):
                     day_idx = d.weekday()
-                    valid_days = [1, 2, 3, 4, 5] # Mar-Sab
-                    
-                    if day_idx not in valid_days:
-                        st.error("❌ La scuola è chiusa Lunedì e Domenica.")
+                    if day_idx not in [1, 2, 3, 4, 5]:
+                        st.error("Chiuso Lunedì e Domenica.")
                     else:
-                        ok, msg_or_num = add_booking(st.session_state['username'], d, slot)
+                        ok, msg = add_booking(st.session_state['username'], d, slot)
                         if ok:
-                            st.success(f"✅ Prenotata lezione {msg_or_num} per il {d}!")
-                            # Ritardo il rerun per far leggere il messaggio
+                            st.success(f"Fatto! Lezione {msg} il {d}")
                             import time
                             time.sleep(1)
                             st.rerun()
                         else:
-                            st.warning(f"⚠️ {msg_or_num}")
+                            st.warning(msg)
 
-        st.markdown("---")
         st.subheader("Le tue Lezioni")
-        
         my_data = get_my_bookings(st.session_state['username'])
         if my_data:
             for item in my_data:
                 bid, bdate, bslot, bnum = item
-                
-                # Layout card per ogni lezione
                 with st.container():
                     c1, c2, c3 = st.columns([1, 3, 1])
                     c1.markdown(f"## {bnum}")
@@ -255,4 +249,4 @@ else:
                         st.rerun()
                     st.divider()
         else:
-            st.info("Non hai ancora prenotato lezioni.")
+            st.info("Nessuna lezione.")
