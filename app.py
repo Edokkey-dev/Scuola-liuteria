@@ -8,7 +8,7 @@ from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
 # --- CONFIGURAZIONE ---
-ADMIN_KEY = "Francescorussoascoltaultimo"
+ADMIN_KEY = st.secrets["admin_password"]
 
 # --- CONNESSIONE SUPABASE ---
 @st.cache_resource
