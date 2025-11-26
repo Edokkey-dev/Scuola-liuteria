@@ -34,7 +34,7 @@ if not supabase:
 
 # --- GESTORE COOKIE (FIXATO) ---
 # ### FIX 1: Aggiunto @st.cache_resource per mantenere stabile il manager
-@st.cache_resource
+
 def get_manager():
     return stx.CookieManager()
 
