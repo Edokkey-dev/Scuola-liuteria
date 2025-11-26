@@ -195,33 +195,65 @@ if not st.session_state['logged_in']:
             st.rerun()
 
 # --- SCHERMATA LOGIN ---
+# --- SCHERMATA LOGIN / REGISTRAZIONE ---
 if not st.session_state['logged_in']:
     tab1, tab2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
 
     with tab1:
         st.subheader("Accedi")
         with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type='password')
+            # .strip() toglie gli spazi vuoti all'inizio e alla fine (es. "mario " diventa "mario")
+            # .lower() trasforma tutto in minuscolo (es. "Mario" diventa "mario") per lo username
+            raw_user = st.text_input("Username")
+            raw_pass = st.text_input("Password", type='password')
+            
             remember_me = st.checkbox("Ricordami per 30 giorni")
             
             if st.form_submit_button("Entra"):
+                # PULIZIA DATI ANTI-TELEFONO
+                username = raw_user.strip().lower() # Username sempre minuscolo e senza spazi
+                password = raw_pass.strip()         # Password senza spazi laterali
+                
                 user_data = verify_user(username, password)
                 if user_data:
-                    # 1. Impostiamo subito lo stato (così l'utente entra)
                     st.session_state['logged_in'] = True
                     st.session_state['username'] = username
                     st.session_state['role'] = user_data['role']
                     
-                    # 2. Se ha scelto "Ricordami", salviamo il cookie
                     if remember_me:
                         cookie_manager.set("scuola_user_session", username, expires_at=datetime.now() + timedelta(days=30))
-                        # ### FIX 2: Pausa fondamentale per dare tempo al browser di scrivere il cookie
                         time.sleep(1)
                     
                     st.rerun()
-                else: st.error("Dati errati.")
+                else: 
+                    st.error("Dati errati. Controlla di non aver messo spazi o maiuscole per sbaglio.")
 
+    with tab2:
+        st.subheader("Nuovo Profilo")
+        with st.form("register_form"):
+            st.info("Consiglio: Usa uno username semplice, tutto minuscolo.")
+            raw_new_user = st.text_input("Scegli Username")
+            raw_new_pass = st.text_input("Scegli Password", type='password')
+            st.markdown("---")
+            is_admin = st.checkbox("Sono il Titolare")
+            admin_code = st.text_input("Codice Segreto", type='password')
+            
+            if st.form_submit_button("Crea Account"):
+                # PULIZIA DATI ANTI-TELEFONO ANCHE QUI
+                new_user = raw_new_user.strip().lower()
+                new_pass = raw_new_pass.strip()
+                
+                role = "student"
+                valid = True
+                if is_admin:
+                    if admin_code == ADMIN_KEY: role = "admin"
+                    else: valid = False; st.error("Chiave errata!")
+                
+                if valid and new_user and new_pass:
+                    if add_user(new_user, new_pass, role): 
+                        st.success(f"Creato utente '{new_user}'! Ora vai su Accedi."); 
+                    else: st.error("Username esistente.")
+                elif valid: st.warning("Compila tutto.")
     with tab2:
         st.subheader("Nuovo Profilo")
         with st.form("register_form"):
