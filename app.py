@@ -3,12 +3,18 @@ import streamlit.components.v1 as components
 import pandas as pd
 import hashlib
 import requests
+import time # NECESSARIO PER IL FIX
 import extra_streamlit_components as stx
 from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
 # --- CONFIGURAZIONE ---
-ADMIN_KEY = st.secrets["admin_password"]
+# Recupera la password dai secrets (assicurati che sia la PRIMA riga dei secrets)
+try:
+    ADMIN_KEY = st.secrets["admin_password"]
+except:
+    st.error("Manca 'admin_password' nei Secrets!")
+    st.stop()
 
 # --- CONNESSIONE SUPABASE ---
 @st.cache_resource
@@ -26,7 +32,9 @@ if not supabase:
     st.error("Errore critico: Impossibile connettersi al Database. Controlla i secrets.")
     st.stop()
 
-# --- GESTORE COOKIE ---
+# --- GESTORE COOKIE (FIXATO) ---
+# ### FIX 1: Aggiunto @st.cache_resource per mantenere stabile il manager
+@st.cache_resource(experimental_allow_widgets=True)
 def get_manager():
     return stx.CookieManager()
 
@@ -173,8 +181,10 @@ if 'logged_in' not in st.session_state:
     st.session_state['username'] = ''
     st.session_state['role'] = ''
 
-# Cookie Login Check
+# --- CHECK COOKIE INIZIALE ---
+# Qui controlliamo se esiste un cookie PRIMA di mostrare il login
 if not st.session_state['logged_in']:
+    # time.sleep(0.1) # Piccolo delay per assicurarsi che il componente sia caricato
     cookie_user = cookie_manager.get("scuola_user_session")
     if cookie_user:
         role = get_user_role(cookie_user)
@@ -184,6 +194,7 @@ if not st.session_state['logged_in']:
             st.session_state['role'] = role
             st.rerun()
 
+# --- SCHERMATA LOGIN ---
 if not st.session_state['logged_in']:
     tab1, tab2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
 
@@ -192,15 +203,22 @@ if not st.session_state['logged_in']:
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type='password')
-            remember_me = st.checkbox("Ricordami")
+            remember_me = st.checkbox("Ricordami per 30 giorni")
+            
             if st.form_submit_button("Entra"):
                 user_data = verify_user(username, password)
                 if user_data:
+                    # 1. Impostiamo subito lo stato (così l'utente entra)
                     st.session_state['logged_in'] = True
                     st.session_state['username'] = username
                     st.session_state['role'] = user_data['role']
+                    
+                    # 2. Se ha scelto "Ricordami", salviamo il cookie
                     if remember_me:
                         cookie_manager.set("scuola_user_session", username, expires_at=datetime.now() + timedelta(days=30))
+                        # ### FIX 2: Pausa fondamentale per dare tempo al browser di scrivere il cookie
+                        time.sleep(1)
+                    
                     st.rerun()
                 else: st.error("Dati errati.")
 
@@ -224,12 +242,16 @@ if not st.session_state['logged_in']:
                     else: st.error("Username esistente.")
                 elif valid: st.warning("Compila tutto.")
 
+# --- UTENTE LOGGATO ---
 else:
     identify_user_onesignal(st.session_state['username'])
     st.sidebar.title(f"Ciao, {st.session_state['username']}")
+    
     if st.sidebar.button("Logout"):
         st.session_state['logged_in'] = False
+        # Cancelliamo il cookie al logout
         cookie_manager.delete("scuola_user_session")
+        time.sleep(1) # Pausa anche qui per sicurezza
         st.rerun()
 
     tab_booking, tab_notif = st.tabs(["📅 Prenotazioni", "🔔 Notifiche"])
@@ -262,29 +284,26 @@ else:
                         if d.weekday() not in [1,2,3,4,5]: st.error("Chiuso Lun/Dom.")
                         else:
                             ok, msg = add_booking(st.session_state['username'], d, s)
-                            if ok: st.success(f"Fatto! Lezione {msg}"); import time; time.sleep(1); st.rerun()
+                            if ok: st.success(f"Fatto! Lezione {msg}"); time.sleep(1); st.rerun()
                             else: st.warning(msg)
 
             st.subheader("Le tue Lezioni")
             my_b = get_my_bookings(st.session_state['username'])
             
-            # --- MODIFICA QUI SOTTO PER IL GIORNO DELLA SETTIMANA ---
+            # LISTA GIORNI IN ITALIANO
             GIORNI_IT = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
             
             if my_b:
                 for item in my_b:
-                    # Calcolo del giorno
                     data_str = item['booking_date']
                     try:
                         data_obj = datetime.strptime(data_str, "%Y-%m-%d")
                         nome_giorno = GIORNI_IT[data_obj.weekday()]
-                    except:
-                        nome_giorno = "" # Fallback se la data è strana
+                    except: nome_giorno = ""
 
                     with st.container():
                         c1, c2, c3 = st.columns([1,3,1])
                         c1.markdown(f"## {item['lesson_number']}")
-                        # Visualizzazione: Esempio "Martedì 2023-11-28"
                         c2.markdown(f"**{nome_giorno} {data_str}**\n\n{item['slot']}")
                         if c3.button("Cancella", key=f"ud_{item['id']}"):
                             delete_booking_student(item['id'])
