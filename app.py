@@ -2,12 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import hashlib
-import smtplib
 import requests
-import random
-import string
-from email.mime.text import MIMEText
-from datetime import datetime, date, timedelta # Aggiunto timedelta
+from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
 # --- CONFIGURAZIONE ---
@@ -31,36 +27,36 @@ if not supabase:
 
 # --- ONE SIGNAL & JAVASCRIPT ---
 def identify_user_onesignal(username):
-    onesignal_app_id = st.secrets["onesignal"]["app_id"]
-    js_code = f"""
-    <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
-    <script>
-      window.OneSignal = window.OneSignal || [];
-      OneSignal.push(function() {{
-        OneSignal.init({{
-          appId: "{onesignal_app_id}",
-          allowLocalhostAsSecureOrigin: true,
-        }});
-        OneSignal.setExternalUserId("{username}");
-      }});
-    </script>
-    """
-    components.html(js_code, height=0)
+    try:
+        onesignal_app_id = st.secrets["onesignal"]["app_id"]
+        js_code = f"""
+        <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+        <script>
+          window.OneSignal = window.OneSignal || [];
+          OneSignal.push(function() {{
+            OneSignal.init({{
+              appId: "{onesignal_app_id}",
+              allowLocalhostAsSecureOrigin: true,
+            }});
+            OneSignal.setExternalUserId("{username}");
+          }});
+        </script>
+        """
+        components.html(js_code, height=0)
+    except:
+        pass # Se mancano i secrets di OneSignal, l'app continua comunque
 
 # --- GESTIONE NOTIFICHE (PUSH + DB STORICO) ---
 
 def clean_old_notifications():
     """Cancella le notifiche più vecchie di 30 giorni"""
     try:
-        # Calcola la data di 30 giorni fa
         cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
-        # Elimina le righe dove created_at < cutoff_date
         supabase.table("notifications").delete().lt("created_at", cutoff_date).execute()
     except Exception as e:
         print(f"Errore pulizia notifiche: {e}")
 
 def save_notification_to_db(username, message):
-    """Salva la notifica nel database per lo storico"""
     try:
         supabase.table("notifications").insert({
             "username": username,
@@ -70,11 +66,7 @@ def save_notification_to_db(username, message):
         print(f"Errore salvataggio DB: {e}")
 
 def send_notification(message, target_usernames=None, heading="Avviso Scuola"):
-    """
-    1. Invia Push Notification (OneSignal)
-    2. Salva nello Storico (Supabase)
-    """
-    # 1. Salva nel DB (Per ogni utente destinatario)
+    # 1. Salva nel DB Storico
     if target_usernames:
         for user in target_usernames:
             save_notification_to_db(user, message)
@@ -103,33 +95,11 @@ def send_notification(message, target_usernames=None, heading="Avviso Scuola"):
         return False
 
 def get_my_notifications(username):
-    """Recupera lo storico notifiche dell'utente, ordinate per data"""
-    # Prima puliamo quelle vecchie
     clean_old_notifications()
-    
     response = supabase.table("notifications").select("*")\
                .eq("username", username)\
                .order("created_at", desc=True).execute()
     return response.data
-
-# --- FUNZIONI EMAIL ---
-def send_email(to_email, subject, body):
-    try:
-        smtp_server = st.secrets["email"]["smtp_server"]
-        smtp_port = st.secrets["email"]["smtp_port"]
-        sender_email = st.secrets["email"]["sender_email"]
-        sender_password = st.secrets["email"]["sender_password"]
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = sender_email
-        msg['To'] = to_email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
-        return True
-    except:
-        return False
 
 # --- FUNZIONI DB UTENTI/PRENOTAZIONI ---
 def hash_password(password):
@@ -143,26 +113,13 @@ def verify_user(username, password):
         return None
     except: return None
 
-def add_user(username, password, email, role):
+def add_user(username, password, role):
+    # Rimossa la richiesta EMAIL
     try:
-        data = {"username": username, "password": hash_password(password), "email": email, "role": role}
+        data = {"username": username, "password": hash_password(password), "role": role}
         supabase.table("users").insert(data).execute()
         return True
     except: return False
-
-def update_password(username, new_password):
-    try:
-        hashed = hash_password(new_password)
-        supabase.table("users").update({"password": hashed}).eq("username", username).execute()
-        return True
-    except: return False
-
-def get_user_email(username):
-    try:
-        response = supabase.table("users").select("email").eq("username", username).execute()
-        if response.data: return response.data[0]['email']
-        return None
-    except: return None
 
 def calculate_next_lesson_number(username):
     response = supabase.table("bookings").select("*", count="exact").eq("username", username).execute()
@@ -181,9 +138,11 @@ def add_booking(username, booking_date, slot):
         supabase.table("bookings").insert(new_booking).execute()
         
         # NOTIFICA ADMIN
-        admin_user = st.secrets["onesignal"]["admin_username"]
-        msg_admin = f"{username} ha prenotato: {str_date} ore {slot}."
-        send_notification(msg_admin, target_usernames=[admin_user], heading="Nuova Lezione 📅")
+        try:
+            admin_user = st.secrets["onesignal"]["admin_username"]
+            msg_admin = f"{username} ha prenotato: {str_date} ore {slot}."
+            send_notification(msg_admin, target_usernames=[admin_user], heading="Nuova Lezione 📅")
+        except: pass # Se manca config admin, prosegue
         
         # NOTIFICA 8° LEZIONE
         if lesson_num == 8:
@@ -211,7 +170,6 @@ def delete_booking_admin(booking_id):
             b_date = booking['booking_date']
             supabase.table("bookings").delete().eq("id", booking_id).execute()
             
-            # NOTIFICA CANCELLAZIONE
             msg = f"Lezione del {b_date} cancellata dalla segreteria."
             send_notification(msg, target_usernames=[student_name], heading="Cancellazione ❌")
             return True
@@ -228,11 +186,11 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
     st.session_state['username'] = ''
     st.session_state['role'] = ''
-    if 'reset_stage' not in st.session_state: st.session_state['reset_stage'] = 0
 
 if not st.session_state['logged_in']:
-    tab1, tab2, tab3 = st.tabs(["🔐 Accedi", "📝 Registrati", "❓ Password Persa"])
-    # (Codice Login/Registrazione standard - Assicurati di includerlo qui come nelle versioni precedenti)
+    # Solo 2 Tab ora
+    tab1, tab2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
+
     with tab1:
         st.subheader("Accedi")
         with st.form("login_form"):
@@ -250,9 +208,9 @@ if not st.session_state['logged_in']:
     with tab2:
         st.subheader("Nuovo Profilo")
         with st.form("register_form"):
-            new_user = st.text_input("Username")
-            new_email = st.text_input("Email")
-            new_pass = st.text_input("Password", type='password')
+            new_user = st.text_input("Scegli Username")
+            # RIMOSSO CAMPO EMAIL
+            new_pass = st.text_input("Scegli Password", type='password')
             st.markdown("---")
             is_admin = st.checkbox("Sono il Titolare")
             admin_code = st.text_input("Codice Segreto", type='password')
@@ -262,11 +220,15 @@ if not st.session_state['logged_in']:
                 if is_admin:
                     if admin_code == ADMIN_KEY: role = "admin"
                     else: valid = False; st.error("Chiave errata!")
+                
                 if valid and new_user and new_pass:
-                    if add_user(new_user, new_pass, new_email, role): st.success("Fatto! Accedi."); 
-                    else: st.error("Username esistente.")
-    with tab3:
-        st.info("Recupero password (codice standard omesso per brevità).")
+                    # Funzione add_user senza email
+                    if add_user(new_user, new_pass, role): 
+                        st.success("Account creato! Vai su Accedi.")
+                    else: 
+                        st.error("Username già in uso.")
+                elif valid:
+                    st.warning("Compila tutti i campi.")
 
 else:
     # --- UTENTE LOGGATO ---
@@ -277,13 +239,10 @@ else:
         st.session_state['logged_in'] = False
         st.rerun()
 
-    # --- MENU DI NAVIGAZIONE ---
-    # Usiamo le Tab per separare Prenotazioni da Notifiche
     tab_booking, tab_notif = st.tabs(["📅 Prenotazioni", "🔔 Notifiche"])
 
     # === TAB 1: PRENOTAZIONI ===
     with tab_booking:
-        # DASHBOARD ADMIN
         if st.session_state['role'] == 'admin':
             st.subheader("👑 Registro Globale")
             data = get_all_bookings_admin()
@@ -299,7 +258,6 @@ else:
             else:
                 st.info("Nessuna prenotazione.")
 
-        # DASHBOARD STUDENTE
         elif st.session_state['role'] == 'student':
             next_l = calculate_next_lesson_number(st.session_state['username'])
             st.metric("Prossima Lezione", f"N° {next_l} di 8")
@@ -337,18 +295,14 @@ else:
         notifiche = get_my_notifications(st.session_state['username'])
         
         if notifiche:
-            st.caption("I messaggi vengono cancellati automaticamente dopo 30 giorni.")
+            st.caption("Storico ultimi 30 giorni.")
             for notif in notifiche:
-                # notif['created_at'] arriva come stringa ISO dal DB
-                # Formattiamo la data per renderla leggibile
                 data_grezza = notif['created_at']
                 try:
-                    # Supabase restituisce es: 2023-10-27T10:00:00+00:00
                     data_obj = datetime.fromisoformat(data_grezza.replace('Z', '+00:00'))
                     data_fmt = data_obj.strftime("%d/%m/%Y %H:%M")
                 except:
                     data_fmt = data_grezza
-
                 st.info(f"📅 **{data_fmt}**\n\n{notif['message']}")
         else:
-            st.write("📭 Non hai notifiche recenti.")
+            st.write("📭 Nessun messaggio.")
