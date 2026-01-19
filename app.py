@@ -35,12 +35,28 @@ st.markdown("""
     .booking-card { background-color: white; padding: 15px; border-radius: 8px; border-left: 5px solid #5D4037; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .history-card { background-color: #EFEBE9; padding: 10px; border-radius: 8px; margin-bottom: 5px; font-size: 0.9em; border-left: 5px solid #9E9E9E; }
     
-    /* === ACHIEVEMENTS === */
-    .achievement-box {
-        background-color: #FFFFFF; border: 2px solid #FFD700; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 10px;
+    /* === ACHIEVEMENTS (CLASSIFICA METALLI) === */
+    .ach-box {
+        background-color: #FFFFFF; 
+        border-radius: 12px; 
+        padding: 15px; 
+        text-align: center; 
+        margin-bottom: 15px;
+        transition: transform 0.2s;
     }
-    .achievement-locked { opacity: 0.4; filter: grayscale(100%); }
-    .achievement-unlocked { opacity: 1; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+    .ach-box:hover { transform: scale(1.02); }
+    
+    /* STILI PER LIVELLO */
+    .rank-bronze { border: 3px solid #CD7F32; box-shadow: 0 4px 0 #A0522D; } /* Bronzo */
+    .rank-gold { border: 3px solid #FFD700; box-shadow: 0 4px 0 #DAA520; } /* Oro */
+    .rank-platinum { border: 3px solid #E5E4E2; box-shadow: 0 0 15px rgba(229, 228, 226, 0.8); background: linear-gradient(145deg, #fff, #f4f4f4); } /* Platino */
+    
+    /* STATO BLOCCATO/SBLOCCATO */
+    .ach-locked { opacity: 0.4; filter: grayscale(100%); }
+    .ach-unlocked { opacity: 1; }
+    
+    .ach-title { font-weight: bold; font-size: 0.9rem; margin-top: 5px; color: #3E2723; }
+    .ach-icon { font-size: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -169,30 +185,30 @@ else:
             if sel_std:
                 std_data = get_student_details(sel_std)
                 
-                # SEZIONE OBIETTIVI (Toggle)
-                st.write("#### 🏆 Assegna Obiettivi")
-                c1, c2, c3, c4 = st.columns(4)
+                # SEZIONE OBIETTIVI (Organizzati per Livello)
+                st.markdown("### 🥉 Livello Bronzo (Elementi)")
+                c1, c2, c3 = st.columns(3)
                 
-                # Checkbox che aggiornano istantaneamente il DB
-                if c1.checkbox("Manico Finito", value=std_data.get('ach_manico', False)):
-                    if not std_data.get('ach_manico'): toggle_achievement(sel_std, 'ach_manico', False); st.rerun()
-                else:
-                    if std_data.get('ach_manico'): toggle_achievement(sel_std, 'ach_manico', True); st.rerun()
+                # Helper function per le checkbox admin
+                def make_check(col, label, db_col):
+                    val = std_data.get(db_col, False)
+                    if col.checkbox(label, value=val):
+                        if not val: toggle_achievement(sel_std, db_col, False); st.rerun()
+                    else:
+                        if val: toggle_achievement(sel_std, db_col, True); st.rerun()
 
-                if c2.checkbox("Corpo Finito", value=std_data.get('ach_corpo', False)):
-                    if not std_data.get('ach_corpo'): toggle_achievement(sel_std, 'ach_corpo', False); st.rerun()
-                else:
-                    if std_data.get('ach_corpo'): toggle_achievement(sel_std, 'ach_corpo', True); st.rerun()
-                    
-                if c3.checkbox("Assemblata", value=std_data.get('ach_assemblata', False)):
-                    if not std_data.get('ach_assemblata'): toggle_achievement(sel_std, 'ach_assemblata', False); st.rerun()
-                else:
-                    if std_data.get('ach_assemblata'): toggle_achievement(sel_std, 'ach_assemblata', True); st.rerun()
-                    
-                if c4.checkbox("Chitarra Finita", value=std_data.get('ach_finita', False)):
-                    if not std_data.get('ach_finita'): toggle_achievement(sel_std, 'ach_finita', False); st.rerun()
-                else:
-                    if std_data.get('ach_finita'): toggle_achievement(sel_std, 'ach_finita', True); st.rerun()
+                make_check(c1, "Rosetta", "ach_rosetta")
+                make_check(c2, "Ponte", "ach_ponte")
+                make_check(c3, "Assemblata", "ach_assemblata")
+
+                st.markdown("### 🥇 Livello Oro (Struttura)")
+                c4, c5 = st.columns(2)
+                make_check(c4, "Manico", "ach_manico")
+                make_check(c5, "Corpo", "ach_corpo")
+
+                st.markdown("### 💎 Livello Platino (Maestro)")
+                c6 = st.columns(1)[0]
+                make_check(c6, "Chitarra Completata", "ach_finita")
 
                 st.divider()
                 
@@ -233,34 +249,46 @@ else:
             else: st.info("Nessuna prenotazione futura.")
 
         with tab_carr:
-            # Recupera dati utente aggiornati per vedere gli achievement
             me = get_student_details(st.session_state['username'])
             
-            st.subheader("I tuoi Obiettivi")
-            ac1, ac2, ac3, ac4 = st.columns(4)
+            st.subheader("La tua Bacheca")
             
-            # Helper per visualizzare le medaglie
-            def show_badge(col, title, active, icon):
-                style = "achievement-unlocked" if active else "achievement-locked"
-                emoji = icon if active else "🔒"
+            # Helper per visualizzare badge con rank
+            def show_badge(col, title, active, icon, rank_class):
+                state = "ach-unlocked" if active else "ach-locked"
+                icon_display = icon if active else "🔒"
                 col.markdown(f"""
-                <div class='achievement-box {style}'>
-                    <div style='font-size:30px;'>{emoji}</div>
-                    <div style='font-size:12px; font-weight:bold; color:#3E2723;'>{title}</div>
+                <div class='ach-box {rank_class} {state}'>
+                    <div class='ach-icon'>{icon_display}</div>
+                    <div class='ach-title'>{title}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            show_badge(ac1, "Manico", me.get('ach_manico'), "🪵")
-            show_badge(ac2, "Corpo", me.get('ach_corpo'), "🎸")
-            show_badge(ac3, "Assemblaggio", me.get('ach_assemblata'), "🔧")
-            show_badge(ac4, "Finita!", me.get('ach_finita'), "🏆")
+            # BRONZO
+            st.write("🥉 **Base**")
+            b1, b2, b3 = st.columns(3)
+            show_badge(b1, "Rosetta", me.get('ach_rosetta'), "🏵️", "rank-bronze")
+            show_badge(b2, "Ponte", me.get('ach_ponte'), "🌉", "rank-bronze")
+            show_badge(b3, "Assemblaggio", me.get('ach_assemblata'), "🔧", "rank-bronze")
+
+            # ORO
+            st.write("🥇 **Avanzato**")
+            g1, g2 = st.columns(2)
+            show_badge(g1, "Manico", me.get('ach_manico'), "🪵", "rank-gold")
+            show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸", "rank-gold")
+
+            # PLATINO
+            st.write("💎 **Maestro Liutaio**")
+            p1 = st.columns(1)[0]
+            show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆", "rank-platinum")
             
             st.divider()
             
-            st.subheader("Storico Lezioni Passate")
+            st.subheader("Storico")
             past = get_past_bookings(st.session_state['username'])
             if past:
                 for p in past:
                     st.markdown(f"<div class='history-card'>✅ <b>{p['booking_date']}</b> | {p['slot']} <br> Lezione #{p['lesson_number']}</div>", unsafe_allow_html=True)
             else:
                 st.write("Ancora nessuna lezione conclusa.")
+                
