@@ -7,34 +7,40 @@ import time
 import extra_streamlit_components as stx
 from datetime import datetime, date, timedelta
 from supabase import create_client, Client
+import os
 
-# --- IMMAGINI DAL SITO (Sostituibili se ne hai di migliori locali) ---
-# Nota: Questi sono link recuperati, se hai i file .png nel progetto usa i percorsi locali
-LOGO_URL = "http://googleusercontent.com/image_collection/image_retrieval/2250419749088067311_0" 
-LAB_URL = "http://googleusercontent.com/image_collection/image_retrieval/1227306324371185581_0"
-
-# --- 1. CONFIGURAZIONE PAGINA & CSS "SAN BARNABA STYLE" ---
+# --- 1. CONFIGURAZIONE PAGINA & CSS "SAN BARNABA" ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
+# --- CSS PERSONALIZZATO (Stile Sito Ufficiale) ---
 st.markdown("""
 <style>
-    /* === GENERALI === */
-    .stApp { background-color: #FAF9F6; /* Bianco sporco elegante */ }
-    h1, h2, h3, h4, p, span, label, div { color: #2C2C2C; font-family: 'Georgia', serif; } /* Font più classico */
+    /* Sfondo Generale - Bianco Caldo */
+    .stApp { background-color: #FAF9F6; }
+    
+    /* Font e Testi */
+    h1, h2, h3, h4, p, span, label, div { 
+        color: #2C2C2C; 
+        font-family: 'Georgia', serif; 
+    }
 
-    /* === SIDEBAR === */
-    [data-testid="stSidebar"] { background-color: #1E1E1E !important; border-right: 1px solid #C0A062; }
+    /* Sidebar - Scuro Elegante */
+    [data-testid="stSidebar"] { 
+        background-color: #1E1E1E !important; 
+        border-right: 1px solid #C0A062; 
+    }
     [data-testid="stSidebar"] * { color: #E0E0E0 !important; }
 
-    /* === LOGIN E INPUT === */
+    /* Login Box */
     [data-testid="stForm"] { 
         background-color: #FFFFFF; 
         padding: 40px; 
-        border-radius: 4px; /* Angoli meno arrotondati, più serio */
-        border-top: 5px solid #C0A062; /* Oro antico */
+        border-radius: 4px; 
+        border-top: 5px solid #C0A062; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
     }
     
+    /* Input Fields */
     .stTextInput > div > div > input, .stDateInput > div > div > input, div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important; 
         color: #333 !important; 
@@ -42,9 +48,9 @@ st.markdown("""
         border-radius: 2px !important;
     }
     
-    /* === BOTTONI === */
+    /* Bottoni - Oro San Barnaba */
     .stButton > button { 
-        background-color: #C0A062 !important; /* Oro San Barnaba */
+        background-color: #C0A062 !important; 
         color: #FFFFFF !important; 
         border-radius: 2px !important; 
         width: 100%; 
@@ -58,22 +64,22 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(192, 160, 98, 0.4);
     }
 
-    /* === BOX CONTATORE LEZIONI === */
+    /* Box Contatore Lezioni */
     .counter-box {
         background-color: #2C2C2C; 
         padding: 25px; 
         border-radius: 4px; 
         text-align: center; 
-        margin-bottom: 25px;
+        margin-bottom: 25px; 
         border: 1px solid #C0A062;
     }
     .counter-box h2 {
         color: #C0A062 !important; 
         margin: 0;
-        font-family: 'Helvetica Neue', sans-serif; /* Più moderno per i numeri */
+        font-family: 'Helvetica Neue', sans-serif;
     }
 
-    /* === STORICO & CARD === */
+    /* Card Storico */
     .booking-card { 
         background-color: white; 
         padding: 20px; 
@@ -82,7 +88,6 @@ st.markdown("""
         margin-bottom: 15px; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
     }
-    
     .history-card { 
         background-color: #F4F4F4; 
         padding: 15px; 
@@ -101,11 +106,11 @@ st.markdown("""
         padding: 3px 10px; 
         border-radius: 20px; 
         font-size: 0.75em; 
-        margin-left: 10px;
+        margin-left: 10px; 
         text-transform: uppercase;
     }
 
-    /* === BADGES PROFILO === */
+    /* Badges */
     .ach-box { background-color: #FFFFFF; border-radius: 4px; padding: 15px; text-align: center; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid #eee; }
     .rank-bronze { border-bottom: 4px solid #CD7F32; }
     .rank-gold { border-bottom: 4px solid #FFD700; }
@@ -196,13 +201,16 @@ def assign_achievement_to_lesson(booking_id, student_username, achievement_name)
             return True
     except: return False
 
-# --- HEADER CON LOGO ---
+# --- HEADER CON LOGO LOCALE ---
 col_logo_1, col_logo_2, col_logo_3 = st.columns([1, 2, 1])
 with col_logo_2:
-    try:
-        st.image(LOGO_URL, use_column_width=True)
-    except:
-        st.markdown("<h1 style='text-align: center;'>Accademia Liuteria</h1>", unsafe_allow_html=True)
+    # Cerca il file logo.png caricato su GitHub
+    if os.path.exists("logo.png"):
+        st.image("logo.png", use_column_width=True)
+    else:
+        # Fallback se non hai ancora caricato l'immagine
+        st.markdown("<h1 style='text-align: center; color:#2C2C2C;'>Accademia Liuteria</h1>", unsafe_allow_html=True)
+
 st.markdown("<div style='text-align:center; color:#666; font-style:italic; margin-bottom: 20px;'>San Barnaba</div>", unsafe_allow_html=True)
 
 
@@ -236,13 +244,13 @@ if not st.session_state['logged_in']:
                         if add_user(nu, np, r): st.success("Fatto! Accedi.")
                         else: st.error("Esiste già")
 
-# APP
+# APP INTERNA
 else:
     identify_user_onesignal(st.session_state['username'])
     with st.sidebar:
-        # IMMAGINE ATMOSFERICA NEL SIDEBAR
-        try: st.image(LAB_URL, use_column_width=True)
-        except: pass
+        # IMMAGINE SIDEBAR LOCALE
+        if os.path.exists("sidebar.jpg"):
+            st.image("sidebar.jpg", use_column_width=True)
         
         st.markdown(f"### 👤 {st.session_state['username'].upper()}")
         st.markdown("---")
