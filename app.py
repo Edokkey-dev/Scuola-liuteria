@@ -8,8 +8,8 @@ import extra_streamlit_components as stx
 from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
-# --- 1. CONFIGURAZIONE PAGINA & CSS MIGLIORATO ---
-st.set_page_config(page_title="Scuola Liuteria", page_icon="🎻", layout="centered")
+# --- 1. CONFIGURAZIONE PAGINA & CSS AVANZATO ---
+st.set_page_config(page_title="Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
 st.markdown("""
 <style>
@@ -18,7 +18,7 @@ st.markdown("""
         background-color: #F9F7F2;
     }
     
-    /* FIX TESTI INVISIBILI - Forza il colore marrone su tutte le etichette */
+    /* FIX TESTI - Colore marrone scuro per massima leggibilità */
     label, .stMarkdown, p, span, stText {
         color: #4A3B2A !important;
         font-weight: 500 !important;
@@ -28,27 +28,41 @@ st.markdown("""
     h1 {
         color: #4A3B2A !important;
         font-family: 'Georgia', serif;
-        padding-bottom: 20px;
+        padding-bottom: 10px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
 
-    /* BOTTONI */
+    /* RIQUADRO LOGIN (BOX SCURO) */
+    .login-container {
+        background-color: #EFEBE9; /* Colore più scuro dello sfondo crema */
+        padding: 30px;
+        border-radius: 15px;
+        border: 1px solid #D7CCC8;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        margin-top: 20px;
+    }
+
+    /* BOTTONI - Stile Legno pregiato */
     .stButton > button {
-        background-color: #8B5A2B;
+        background-color: #5D4037;
         color: white !important;
         border-radius: 8px;
         border: none;
-        padding: 10px 20px;
+        padding: 12px 24px;
         font-weight: bold;
+        transition: all 0.3s ease;
     }
     .stButton > button:hover {
-        background-color: #6D4C41;
-        border: 1px solid #FFD700;
+        background-color: #3E2723;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 
     /* CAMPI DI INPUT */
-    input {
+    .stTextInput > div > div > input {
         border: 1px solid #8B5A2B !important;
         border-radius: 8px !important;
+        background-color: white !important;
     }
 
     /* CARD PRENOTAZIONI */
@@ -62,17 +76,18 @@ st.markdown("""
         color: #4A3B2A;
     }
 
-    /* TABS */
+    /* TAB STYLE */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #EFEBE9;
+        background-color: #D7CCC8;
         border-radius: 8px 8px 0 0;
         padding: 10px 20px;
+        color: #4A3B2A !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #8B5A2B;
+        background-color: #5D4037;
         color: white !important;
     }
 </style>
@@ -102,7 +117,7 @@ def get_manager():
 
 cookie_manager = get_manager()
 
-# --- 5. LOGICHE E FUNZIONI (Identiche alle precedenti) ---
+# --- 5. FUNZIONI LOGICHE ---
 def identify_user_onesignal(username):
     try:
         onesignal_app_id = st.secrets["onesignal"]["app_id"]
@@ -164,7 +179,7 @@ def get_all_bookings_admin(): return supabase.table("bookings").select("*").orde
 def delete_booking(bid): supabase.table("bookings").delete().eq("id", bid).execute()
 
 # --- 6. INTERFACCIA ---
-st.markdown("<h1 style='text-align: center;'>🎻 Scuola di Liuteria</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🎻 Liuteria San Barnaba</h1>", unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state:
     st.session_state.update({'logged_in': False, 'username': '', 'role': ''})
@@ -180,10 +195,11 @@ if not st.session_state['logged_in']:
                 st.rerun()
     except: pass
 
-# UI ACCESSO
+# UI ACCESSO (CON RIQUADRO SCURO)
 if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 10, 1])
     with col2:
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
         with tab1:
             with st.form("login"):
@@ -206,43 +222,4 @@ if not st.session_state['logged_in']:
                     role = "admin" if (ia and ac == ADMIN_KEY) else "student"
                     if ia and ac != ADMIN_KEY: st.error("Codice Admin errato")
                     elif nu and np:
-                        if add_user(nu, np, role): st.success("Registrato! Accedi ora.")
-                        else: st.error("Username esistente.")
-
-# AREA RISERVATA
-else:
-    identify_user_onesignal(st.session_state['username'])
-    with st.sidebar:
-        st.write(f"👤 Utente: **{st.session_state['username']}**")
-        if st.button("🚪 Esci"):
-            st.session_state['logged_in'] = False
-            cookie_manager.delete("scuola_user_session")
-            st.rerun()
-
-    tab_bk, tab_msg = st.tabs(["📅 Prenotazioni", "🔔 Messaggi"])
-    
-    with tab_bk:
-        if st.session_state['role'] == 'admin':
-            st.write("### 👑 Registro Lezioni")
-            data = get_all_bookings_admin()
-            for x in data:
-                st.markdown(f"<div class='booking-card'><b>👤 {x['username']}</b><br>📅 {x['booking_date']} | 🕒 {x['slot']}<br>Lezione #{x['lesson_number']}</div>", unsafe_allow_html=True)
-                if st.button("Elimina", key=x['id']): delete_booking(x['id']); st.rerun()
-        else:
-            nxt = calculate_next_lesson_number(st.session_state['username'])
-            st.info(f"Prossima lezione da scalare: **#{nxt}**")
-            with st.form("new"):
-                d = st.date_input("Giorno", min_value=date.today())
-                s = st.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
-                if st.form_submit_button("Prenota"):
-                    if d.weekday() in [0, 6]: st.error("Chiuso Lun/Dom")
-                    else:
-                        ok, m = add_booking(st.session_state['username'], d, s)
-                        if ok: st.success("Fatto!"); time.sleep(1); st.rerun()
-                        else: st.warning(m)
-            
-            st.write("### 🎻 Le tue lezioni")
-            my = get_my_bookings(st.session_state['username'])
-            for x in my:
-                st.markdown(f"<div class='booking-card'><b>📅 {x['booking_date']}</b><br>🕒 {x['slot']} | Lezione #{x['lesson_number']}</div>", unsafe_allow_html=True)
-                if st.button("Cancella", key=x['id']): delete_booking(x['id']); st.rerun()
+                        if add_user(nu, np, role):
