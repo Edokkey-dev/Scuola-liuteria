@@ -222,4 +222,44 @@ if not st.session_state['logged_in']:
                     role = "admin" if (ia and ac == ADMIN_KEY) else "student"
                     if ia and ac != ADMIN_KEY: st.error("Codice Admin errato")
                     elif nu and np:
-                        if add_user(nu, np, role):
+                        if add_user(nu, np, role): st.success("Registrato! Accedi ora.")
+                        else: st.error("Username esistente.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# AREA RISERVATA
+else:
+    identify_user_onesignal(st.session_state['username'])
+    with st.sidebar:
+        st.write(f"👤 Utente: **{st.session_state['username']}**")
+        if st.button("🚪 Esci"):
+            st.session_state['logged_in'] = False
+            cookie_manager.delete("scuola_user_session")
+            st.rerun()
+
+    tab_bk, tab_msg = st.tabs(["📅 Prenotazioni", "🔔 Messaggi"])
+    
+    with tab_bk:
+        if st.session_state['role'] == 'admin':
+            st.write("### 👑 Registro Globale")
+            data = get_all_bookings_admin()
+            for x in data:
+                st.markdown(f"<div class='booking-card'><b>👤 {x['username']}</b><br>📅 {x['booking_date']} | 🕒 {x['slot']}<br>Lezione #{x['lesson_number']}</div>", unsafe_allow_html=True)
+                if st.button("Elimina", key=x['id']): delete_booking(x['id']); st.rerun()
+        else:
+            nxt = calculate_next_lesson_number(st.session_state['username'])
+            st.info(f"Prossima lezione da scalare: **#{nxt}**")
+            with st.form("new"):
+                d = st.date_input("Giorno", min_value=date.today())
+                s = st.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
+                if st.form_submit_button("Prenota"):
+                    if d.weekday() in [0, 6]: st.error("Chiuso Lun/Dom")
+                    else:
+                        ok, m = add_booking(st.session_state['username'], d, s)
+                        if ok: st.success("Fatto!"); time.sleep(1); st.rerun()
+                        else: st.warning(m)
+            
+            st.write("### 🎻 Le tue lezioni")
+            my = get_my_bookings(st.session_state['username'])
+            for x in my:
+                st.markdown(f"<div class='booking-card'><b>📅 {x['booking_date']}</b><br>🕒 {x['slot']} | Lezione #{x['lesson_number']}</div>", unsafe_allow_html=True)
+                if st.button("Cancella", key=x['id']): delete_booking(x['id']); st.rerun()
