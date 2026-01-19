@@ -8,7 +8,7 @@ import extra_streamlit_components as stx
 from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
-# --- 1. CONFIGURAZIONE PAGINA & CSS ---
+# --- 1. CONFIGURAZIONE PAGINA & CSS "BOTTEGA PRO" ---
 st.set_page_config(page_title="Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
 st.markdown("""
@@ -34,6 +34,23 @@ st.markdown("""
     /* === CARD LEZIONI === */
     .booking-card { background-color: white; padding: 15px; border-radius: 8px; border-left: 5px solid #5D4037; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     
+    /* === BOX CONTATORE LEZIONI (FIX GRAFICO) === */
+    .counter-box {
+        background-color: #3E2723; 
+        padding: 20px; 
+        border-radius: 10px; 
+        text-align: center; 
+        margin-bottom: 20px;
+        border: 2px solid #5D4037;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    /* Forza il titolo dentro il box ad essere Oro */
+    .counter-box h2 {
+        color: #FFD700 !important; 
+        margin: 0;
+        text-shadow: 1px 1px 2px black;
+    }
+
     /* === STORICO CON PREMI === */
     .history-card { 
         background-color: #EFEBE9; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #9E9E9E; position: relative;
@@ -69,7 +86,7 @@ def init_connection():
 supabase = init_connection()
 cookie_manager = stx.CookieManager()
 
-# --- DIZIONARIO OBIETTIVI (Mapping: Nome Visuale -> Colonna DB Utente) ---
+# --- DIZIONARIO OBIETTIVI ---
 ACHIEVEMENTS_MAP = {
     "Rosetta 🏵️": "ach_rosetta",
     "Ponte 🌉": "ach_ponte",
@@ -111,7 +128,6 @@ def get_future_bookings(u):
 
 def get_past_bookings(u):
     today = date.today().isoformat()
-    # Recuperiamo anche la colonna 'achievement'
     return supabase.table("bookings").select("*").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).execute().data
 
 def get_all_future_bookings_admin():
@@ -127,13 +143,9 @@ def get_student_details(u):
     res = supabase.table("users").select("*").eq("username", u).execute()
     return res.data[0] if res.data else None
 
-# --- NUOVA FUNZIONE DI ASSEGNAZIONE ---
 def assign_achievement_to_lesson(booking_id, student_username, achievement_name):
     try:
-        # 1. Aggiorna la prenotazione scrivendo il nome del premio
         supabase.table("bookings").update({"achievement": achievement_name}).eq("id", booking_id).execute()
-        
-        # 2. Se è un premio valido, sblocca anche il badge nel profilo utente (sincronizzazione automatica)
         if achievement_name in ACHIEVEMENTS_MAP:
             col_db = ACHIEVEMENTS_MAP[achievement_name]
             supabase.table("users").update({col_db: True}).eq("username", student_username).execute()
@@ -199,8 +211,6 @@ else:
             
             if sel_std:
                 me = get_student_details(sel_std)
-                
-                # BADGE STATUS (Solo visualizzazione rapida)
                 st.write("**Stato Attuale:**")
                 k1, k2, k3, k4 = st.columns(4)
                 k1.caption(f"Rosetta: {'✅' if me.get('ach_rosetta') else '❌'}")
@@ -214,11 +224,8 @@ else:
                 
                 if past:
                     for p in past:
-                        # LOGICA PER ASSEGNARE OBIETTIVO ALLA LEZIONE
                         with st.container():
                             col_info, col_action = st.columns([3, 2])
-                            
-                            # Info Lezione
                             current_ach = p.get('achievement')
                             ach_display = f"🏆 {current_ach}" if current_ach else ""
                             col_info.markdown(f"""
@@ -229,9 +236,7 @@ else:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Azione Assegnazione
                             options = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
-                            # Se c'è già un achievement, trovalo nella lista per settare l'index
                             idx = 0
                             if current_ach in options: idx = options.index(current_ach)
                             
@@ -244,7 +249,7 @@ else:
                                     time.sleep(1)
                                     st.rerun()
                 else:
-                    st.info("Questo studente non ha ancora fatto lezioni.")
+                    st.info("Nessuna lezione.")
 
     # --- VISTA STUDENTE ---
     else:
@@ -252,7 +257,12 @@ else:
         
         with tab_agen:
             nxt = calculate_next_lesson_number(st.session_state['username'])
-            st.markdown(f"""<div class="booking-card" style="background:#3E2723; color:gold; text-align:center;"><h2>Lezione {nxt} di 8</h2></div>""", unsafe_allow_html=True)
+            # USO DELLA NUOVA CLASSE 'counter-box' PER FIX GRAFICO
+            st.markdown(f"""
+            <div class="counter-box">
+                <h2>Lezione {nxt} di 8</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
             with st.form("new_bk"):
                 c1, c2 = st.columns(2)
@@ -292,7 +302,7 @@ else:
             show_badge(g1, "Manico", me.get('ach_manico'), "🪵", "rank-gold")
             show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸", "rank-gold")
 
-            st.write("💎 **Maestro**")
+            st.write("💎 **Maestro**")  # Corretto da "Maestro Liutaio" a "Maestro"
             p1 = st.columns(1)[0]
             show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆", "rank-platinum")
             
@@ -302,7 +312,6 @@ else:
             past = get_past_bookings(st.session_state['username'])
             if past:
                 for p in past:
-                    # Se c'è un achievement, rendiamo la card speciale
                     is_special = p.get('achievement') is not None
                     ach_html = f"<span class='achievement-tag'>🏆 {p['achievement']}</span>" if is_special else ""
                     cls_special = "special" if is_special else ""
