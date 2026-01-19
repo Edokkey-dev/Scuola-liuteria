@@ -8,69 +8,113 @@ import extra_streamlit_components as stx
 from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 
-# --- 1. CONFIGURAZIONE PAGINA & CSS "BOTTEGA PRO" ---
-st.set_page_config(page_title="Liuteria San Barnaba", page_icon="🎻", layout="centered")
+# --- IMMAGINI DAL SITO (Sostituibili se ne hai di migliori locali) ---
+# Nota: Questi sono link recuperati, se hai i file .png nel progetto usa i percorsi locali
+LOGO_URL = "http://googleusercontent.com/image_collection/image_retrieval/2250419749088067311_0" 
+LAB_URL = "http://googleusercontent.com/image_collection/image_retrieval/1227306324371185581_0"
+
+# --- 1. CONFIGURAZIONE PAGINA & CSS "SAN BARNABA STYLE" ---
+st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
 st.markdown("""
 <style>
     /* === GENERALI === */
-    .stApp { background-color: #F9F7F2; }
-    h1, h2, h3, h4, p, span, label, div { color: #3E2723; font-family: 'Helvetica Neue', sans-serif; }
+    .stApp { background-color: #FAF9F6; /* Bianco sporco elegante */ }
+    h1, h2, h3, h4, p, span, label, div { color: #2C2C2C; font-family: 'Georgia', serif; } /* Font più classico */
 
     /* === SIDEBAR === */
-    [data-testid="stSidebar"] { background-color: #2D1B15 !important; border-right: 2px solid #8B5A2B; }
-    [data-testid="stSidebar"] * { color: #F5F5DC !important; }
+    [data-testid="stSidebar"] { background-color: #1E1E1E !important; border-right: 1px solid #C0A062; }
+    [data-testid="stSidebar"] * { color: #E0E0E0 !important; }
 
     /* === LOGIN E INPUT === */
-    [data-testid="stForm"] { background-color: #FFFFFF; padding: 30px; border-radius: 15px; border: 1px solid #D7CCC8; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    [data-testid="stForm"] { 
+        background-color: #FFFFFF; 
+        padding: 40px; 
+        border-radius: 4px; /* Angoli meno arrotondati, più serio */
+        border-top: 5px solid #C0A062; /* Oro antico */
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
+    }
+    
     .stTextInput > div > div > input, .stDateInput > div > div > input, div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #8B5A2B !important; border-radius: 8px !important;
+        background-color: #FFFFFF !important; 
+        color: #333 !important; 
+        border: 1px solid #ccc !important; 
+        border-radius: 2px !important;
     }
     
     /* === BOTTONI === */
-    .stButton > button { background-color: #5D4037 !important; color: #FFFFFF !important; border-radius: 8px !important; width: 100%; font-weight:bold !important; }
-    .stButton > button:hover { background-color: #3E2723 !important; color: #FFD700 !important; }
+    .stButton > button { 
+        background-color: #C0A062 !important; /* Oro San Barnaba */
+        color: #FFFFFF !important; 
+        border-radius: 2px !important; 
+        width: 100%; 
+        font-weight: 500 !important; 
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border: none !important;
+    }
+    .stButton > button:hover { 
+        background-color: #A08040 !important; 
+        box-shadow: 0 4px 10px rgba(192, 160, 98, 0.4);
+    }
 
-    /* === CARD LEZIONI === */
-    .booking-card { background-color: white; padding: 15px; border-radius: 8px; border-left: 5px solid #5D4037; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    
-    /* === BOX CONTATORE LEZIONI (FIX GRAFICO) === */
+    /* === BOX CONTATORE LEZIONI === */
     .counter-box {
-        background-color: #3E2723; 
-        padding: 20px; 
-        border-radius: 10px; 
+        background-color: #2C2C2C; 
+        padding: 25px; 
+        border-radius: 4px; 
         text-align: center; 
-        margin-bottom: 20px;
-        border: 2px solid #5D4037;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        margin-bottom: 25px;
+        border: 1px solid #C0A062;
     }
-    /* Forza il titolo dentro il box ad essere Oro */
     .counter-box h2 {
-        color: #FFD700 !important; 
+        color: #C0A062 !important; 
         margin: 0;
-        text-shadow: 1px 1px 2px black;
+        font-family: 'Helvetica Neue', sans-serif; /* Più moderno per i numeri */
     }
 
-    /* === STORICO CON PREMI === */
+    /* === STORICO & CARD === */
+    .booking-card { 
+        background-color: white; 
+        padding: 20px; 
+        border-radius: 2px; 
+        border-left: 4px solid #C0A062; 
+        margin-bottom: 15px; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+    }
+    
     .history-card { 
-        background-color: #EFEBE9; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #9E9E9E; position: relative;
+        background-color: #F4F4F4; 
+        padding: 15px; 
+        border-radius: 2px; 
+        margin-bottom: 10px; 
+        border-left: 4px solid #999; 
     }
     .history-card.special {
-        background-color: #FFF8E1; border-left: 5px solid #FFD700; border: 1px solid #FFD700;
+        background-color: #FFFAF0; 
+        border-left: 4px solid #C0A062; 
     }
     .achievement-tag {
-        display: inline-block; background-color: #FFD700; color: #3E2723; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; margin-left: 10px;
+        display: inline-block; 
+        background-color: #C0A062; 
+        color: white; 
+        padding: 3px 10px; 
+        border-radius: 20px; 
+        font-size: 0.75em; 
+        margin-left: 10px;
+        text-transform: uppercase;
     }
 
     /* === BADGES PROFILO === */
-    .ach-box { background-color: #FFFFFF; border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 10px; transition: transform 0.2s; }
-    .ach-box:hover { transform: scale(1.02); }
-    .rank-bronze { border: 3px solid #CD7F32; box-shadow: 0 4px 0 #A0522D; }
-    .rank-gold { border: 3px solid #FFD700; box-shadow: 0 4px 0 #DAA520; }
-    .rank-platinum { border: 3px solid #E5E4E2; box-shadow: 0 0 15px rgba(229, 228, 226, 0.8); background: linear-gradient(145deg, #fff, #f4f4f4); }
-    .ach-locked { opacity: 0.3; filter: grayscale(100%); }
+    .ach-box { background-color: #FFFFFF; border-radius: 4px; padding: 15px; text-align: center; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid #eee; }
+    .rank-bronze { border-bottom: 4px solid #CD7F32; }
+    .rank-gold { border-bottom: 4px solid #FFD700; }
+    .rank-platinum { border-bottom: 4px solid #E5E4E2; background: linear-gradient(to bottom right, #fff, #f8f9fa); }
+    .ach-locked { opacity: 0.2; filter: grayscale(100%); }
     .ach-unlocked { opacity: 1; }
-    .ach-icon { font-size: 2rem; }
+    .ach-icon { font-size: 2.5rem; margin-bottom: 10px; display:block; }
+    .ach-title { font-weight: bold; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -152,9 +196,15 @@ def assign_achievement_to_lesson(booking_id, student_username, achievement_name)
             return True
     except: return False
 
-# --- INTERFACCIA ---
-st.markdown("<h1 style='text-align: center;'>🎻 Liuteria San Barnaba</h1>", unsafe_allow_html=True)
-st.markdown("---")
+# --- HEADER CON LOGO ---
+col_logo_1, col_logo_2, col_logo_3 = st.columns([1, 2, 1])
+with col_logo_2:
+    try:
+        st.image(LOGO_URL, use_column_width=True)
+    except:
+        st.markdown("<h1 style='text-align: center;'>Accademia Liuteria</h1>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#666; font-style:italic; margin-bottom: 20px;'>San Barnaba</div>", unsafe_allow_html=True)
+
 
 if 'logged_in' not in st.session_state: st.session_state.update({'logged_in': False, 'username': '', 'role': ''})
 
@@ -162,12 +212,12 @@ if 'logged_in' not in st.session_state: st.session_state.update({'logged_in': Fa
 if not st.session_state['logged_in']:
     c1, c2, c3 = st.columns([1, 6, 1])
     with c2:
-        t1, t2 = st.tabs(["🔐 Accedi", "📝 Registrati"])
+        t1, t2 = st.tabs(["ACCEDI", "REGISTRATI"])
         with t1:
             with st.form("log"):
                 u = st.text_input("Username").strip()
                 p = st.text_input("Password", type='password').strip()
-                if st.form_submit_button("Entra"):
+                if st.form_submit_button("ENTRA"):
                     ud = verify_user(u, p)
                     if ud:
                         st.session_state.update({'logged_in':True, 'username':u, 'role':ud['role']})
@@ -178,8 +228,8 @@ if not st.session_state['logged_in']:
             with st.form("reg"):
                 nu = st.text_input("Nuovo User").strip()
                 np = st.text_input("Password", type='password').strip()
-                ia = st.checkbox("Titolare"); ac = st.text_input("Codice Admin", type='password')
-                if st.form_submit_button("Crea"):
+                ia = st.checkbox("Sono Titolare"); ac = st.text_input("Codice Admin", type='password')
+                if st.form_submit_button("CREA ACCOUNT"):
                     r = "admin" if ia and ac == ADMIN_KEY else "student"
                     if ia and ac != ADMIN_KEY: st.error("Codice errato")
                     elif nu and np:
@@ -190,22 +240,27 @@ if not st.session_state['logged_in']:
 else:
     identify_user_onesignal(st.session_state['username'])
     with st.sidebar:
-        st.markdown(f"### 👤 {st.session_state['username']}")
-        if st.button("Logout"): st.session_state['logged_in']=False; cookie_manager.delete("scuola_user_session"); st.rerun()
+        # IMMAGINE ATMOSFERICA NEL SIDEBAR
+        try: st.image(LAB_URL, use_column_width=True)
+        except: pass
+        
+        st.markdown(f"### 👤 {st.session_state['username'].upper()}")
+        st.markdown("---")
+        if st.button("LOGOUT"): st.session_state['logged_in']=False; cookie_manager.delete("scuola_user_session"); st.rerun()
 
     # --- VISTA ADMIN ---
     if st.session_state['role'] == 'admin':
-        tab_reg, tab_std = st.tabs(["📅 Registro", "👥 Gestione Studenti"])
+        tab_reg, tab_std = st.tabs(["REGISTRO", "STUDENTI"])
         
         with tab_reg:
             st.subheader("Prossime Lezioni")
             data = get_all_future_bookings_admin()
             for x in data:
                 st.markdown(f"<div class='booking-card'><b>👤 {x['username']}</b><br>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
-                if st.button("Elimina", key=x['id']): delete_booking(x['id']); st.rerun()
+                if st.button("ELIMINA", key=x['id']): delete_booking(x['id']); st.rerun()
         
         with tab_std:
-            st.subheader("Assegna Obiettivi")
+            st.subheader("Gestione Carriera")
             students = [s['username'] for s in get_all_students()]
             sel_std = st.selectbox("Seleziona Studente:", [""] + students)
             
@@ -219,7 +274,7 @@ else:
                 k4.caption(f"Finita: {'✅' if me.get('ach_finita') else '❌'}")
                 
                 st.divider()
-                st.write("#### 📜 Storico & Assegnazioni")
+                st.write("#### Assegnazione su Storico")
                 past = get_past_bookings(sel_std)
                 
                 if past:
@@ -232,7 +287,7 @@ else:
                             <div class='history-card { "special" if current_ach else "" }'>
                                 <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>
                                 {p['slot']} <br>
-                                <span style='color:#B8860B; font-weight:bold;'>{ach_display}</span>
+                                <span style='color:#C0A062; font-weight:bold;'>{ach_display}</span>
                             </div>
                             """, unsafe_allow_html=True)
                             
@@ -241,11 +296,11 @@ else:
                             if current_ach in options: idx = options.index(current_ach)
                             
                             with col_action:
-                                new_val = st.selectbox("Obiettivo raggiunto?", options, index=idx, key=f"sel_{p['id']}", label_visibility="collapsed")
-                                if st.button("Salva", key=f"btn_{p['id']}"):
+                                new_val = st.selectbox("Premio:", options, index=idx, key=f"sel_{p['id']}", label_visibility="collapsed")
+                                if st.button("SALVA", key=f"btn_{p['id']}"):
                                     val_to_save = new_val if new_val != "Nessuno" else None
                                     assign_achievement_to_lesson(p['id'], sel_std, val_to_save)
-                                    st.success("Salvato!")
+                                    st.success("Fatto")
                                     time.sleep(1)
                                     st.rerun()
                 else:
@@ -253,14 +308,13 @@ else:
 
     # --- VISTA STUDENTE ---
     else:
-        tab_agen, tab_carr = st.tabs(["📅 Agenda", "🏆 Carriera"])
+        tab_agen, tab_carr = st.tabs(["AGENDA", "CARRIERA"])
         
         with tab_agen:
             nxt = calculate_next_lesson_number(st.session_state['username'])
-            # USO DELLA NUOVA CLASSE 'counter-box' PER FIX GRAFICO
             st.markdown(f"""
             <div class="counter-box">
-                <h2>Lezione {nxt} di 8</h2>
+                <h2>LEZIONE {nxt} / 8</h2>
             </div>
             """, unsafe_allow_html=True)
             
@@ -268,7 +322,7 @@ else:
                 c1, c2 = st.columns(2)
                 d = c1.date_input("Data", min_value=date.today())
                 s = c2.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
-                if st.form_submit_button("Prenota"):
+                if st.form_submit_button("PRENOTA"):
                     if d.weekday() in [0, 6]: st.error("Chiuso Lun/Dom")
                     else:
                         ok, m = add_booking(st.session_state['username'], d, s)
@@ -280,7 +334,7 @@ else:
             if fut:
                 for x in fut:
                     st.markdown(f"<div class='booking-card'>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
-                    if st.button("Annulla", key=x['id']): delete_booking(x['id']); st.rerun()
+                    if st.button("ANNULLA", key=x['id']): delete_booking(x['id']); st.rerun()
             else: st.info("Nessuna prenotazione futura.")
 
         with tab_carr:
@@ -289,20 +343,20 @@ else:
             def show_badge(col, title, active, icon, rank_class):
                 state = "ach-unlocked" if active else "ach-locked"
                 icon_display = icon if active else "🔒"
-                col.markdown(f"""<div class='ach-box {rank_class} {state}'><div class='ach-icon'>{icon_display}</div><div class='ach-title'>{title}</div></div>""", unsafe_allow_html=True)
+                col.markdown(f"""<div class='ach-box {rank_class} {state}'><span class='ach-icon'>{icon_display}</span><span class='ach-title'>{title}</span></div>""", unsafe_allow_html=True)
 
-            st.write("🥉 **Base**")
+            st.write("🥉 **ELEMENTI BASE**")
             b1, b2, b3 = st.columns(3)
             show_badge(b1, "Rosetta", me.get('ach_rosetta'), "🏵️", "rank-bronze")
             show_badge(b2, "Ponte", me.get('ach_ponte'), "🌉", "rank-bronze")
             show_badge(b3, "Assemblaggio", me.get('ach_assemblata'), "🔧", "rank-bronze")
 
-            st.write("🥇 **Avanzato**")
+            st.write("🥇 **STRUTTURA**")
             g1, g2 = st.columns(2)
             show_badge(g1, "Manico", me.get('ach_manico'), "🪵", "rank-gold")
             show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸", "rank-gold")
 
-            st.write("💎 **Maestro**")  # Corretto da "Maestro Liutaio" a "Maestro"
+            st.write("💎 **MAESTRO**")
             p1 = st.columns(1)[0]
             show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆", "rank-platinum")
             
