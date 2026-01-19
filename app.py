@@ -28,11 +28,10 @@ def init_connection():
 supabase: Client = init_connection()
 
 if not supabase:
-    st.error("Errore critico: Impossibile connettersi al Database. Controlla i secrets.")
+    st.error("Errore critico: Impossibile connettersi al Database.")
     st.stop()
 
-# --- GESTORE COOKIE (CORRETTO) ---
-# Rimossa la cache per evitare l'errore "CachedWidgetWarning"
+# --- GESTORE COOKIE ---
 def get_manager():
     return stx.CookieManager()
 
@@ -42,7 +41,6 @@ cookie_manager = get_manager()
 def identify_user_onesignal(username):
     try:
         onesignal_app_id = st.secrets["onesignal"]["app_id"]
-        # Script ottimizzato per Webview Android (AppsGeyser)
         js_code = f"""
         <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
         <script>
@@ -68,8 +66,7 @@ def clean_old_notifications():
     try:
         cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
         supabase.table("notifications").delete().lt("created_at", cutoff_date).execute()
-    except Exception as e:
-        print(f"Errore pulizia: {e}")
+    except: pass
 
 def save_notification_to_db(username, message):
     try:
@@ -77,12 +74,9 @@ def save_notification_to_db(username, message):
     except: pass
 
 def send_notification(message, target_usernames=None, heading="Avviso Scuola"):
-    # 1. Salva nel DB (Storico)
     if target_usernames:
         for user in target_usernames:
             save_notification_to_db(user, message)
-    
-    # 2. Invia Push (OneSignal)
     try:
         app_id = st.secrets["onesignal"]["app_id"]
         api_key = st.secrets["onesignal"]["api_key"]
@@ -95,7 +89,6 @@ def send_notification(message, target_usernames=None, heading="Avviso Scuola"):
         }
         if target_usernames: payload["include_external_user_ids"] = target_usernames
         else: payload["included_segments"] = ["Subscribed Users"]
-        
         requests.post("https://onesignal.com/api/v1/notifications", headers=header, json=payload)
         return True
     except: return False
@@ -157,10 +150,8 @@ def add_booking(username, booking_date, slot):
             admin_user = st.secrets["onesignal"]["admin_username"]
             send_notification(f"{username} ha prenotato: {str_date} {slot}", [admin_user], "Nuova Lezione")
         except: pass
-        
         if lesson_num == 8:
-            send_notification("Hai raggiunto l'ottava lezione! Ricorda il rinnovo.", [username], "Traguardo 🎉")
-            
+            send_notification("Hai raggiunto l'ottava lezione!", [username], "Traguardo 🎉")
         return True, lesson_num
     except Exception as e: return False, str(e)
 
@@ -196,10 +187,9 @@ if 'logged_in' not in st.session_state:
     st.session_state['username'] = ''
     st.session_state['role'] = ''
 
-# --- CHECK COOKIE INIZIALE (AUTO-LOGIN) ---
+# --- AUTO-LOGIN COOKIE ---
 if not st.session_state['logged_in']:
     try:
-        # time.sleep(0.1) # Opzionale: piccolo delay
         cookie_user = cookie_manager.get("scuola_user_session")
         if cookie_user:
             role = get_user_role(cookie_user)
@@ -222,8 +212,7 @@ if not st.session_state['logged_in']:
             remember_me = st.checkbox("Ricordami per 30 giorni")
             
             if st.form_submit_button("Entra"):
-                # PULIZIA DATI ANTI-TELEFONO
-                username = raw_user.strip().lower()
+                username = raw_user.strip()
                 password = raw_pass.strip()
                 
                 user_data = verify_user(username, password)
@@ -231,28 +220,23 @@ if not st.session_state['logged_in']:
                     st.session_state['logged_in'] = True
                     st.session_state['username'] = username
                     st.session_state['role'] = user_data['role']
-                    
                     if remember_me:
                         cookie_manager.set("scuola_user_session", username, expires_at=datetime.now() + timedelta(days=30))
-                        time.sleep(1) # Delay fondamentale
-                    
+                        time.sleep(1)
                     st.rerun()
-                else: st.error("Dati errati. Controlla spazi o maiuscole.")
+                else: st.error("Dati errati. Verifica maiuscole e minuscole.")
 
     with tab2:
         st.subheader("Nuovo Profilo")
         with st.form("register_form"):
-            st.info("Usa uno username semplice, tutto minuscolo.")
             raw_new_user = st.text_input("Scegli Username")
             raw_new_pass = st.text_input("Scegli Password", type='password')
             st.markdown("---")
             is_admin = st.checkbox("Sono il Titolare")
             admin_code = st.text_input("Codice Segreto", type='password')
             if st.form_submit_button("Crea Account"):
-                # PULIZIA DATI
-                new_user = raw_new_user.strip().lower()
+                new_user = raw_new_user.strip()
                 new_pass = raw_new_pass.strip()
-                
                 role = "student"
                 valid = True
                 if is_admin:
@@ -266,9 +250,7 @@ if not st.session_state['logged_in']:
 
 # --- AREA RISERVATA ---
 else:
-    # Esegue lo script OneSignal ogni volta che l'utente è loggato
     identify_user_onesignal(st.session_state['username'])
-    
     st.sidebar.title(f"Ciao, {st.session_state['username']}")
     
     if st.sidebar.button("Logout"):
@@ -280,25 +262,18 @@ else:
     tab_booking, tab_notif = st.tabs(["📅 Prenotazioni", "🔔 Notifiche"])
 
     with tab_booking:
-        # --- VISTA ADMIN ---
         if st.session_state['role'] == 'admin':
             st.subheader("👑 Registro Globale")
-            
-            # Pannello Reset Password
             with st.expander("🔧 Gestione Studenti (Reset Password)"):
                 with st.form("reset_admin_form"):
                     col_user, col_pass = st.columns(2)
                     target_user = col_user.text_input("Username Studente")
                     new_pass_admin = col_pass.text_input("Nuova Password")
                     if st.form_submit_button("Aggiorna Password"):
-                        clean_target = target_user.strip().lower()
-                        clean_pass = new_pass_admin.strip()
-                        if update_password(clean_target, clean_pass):
-                            st.success(f"Password di {clean_target} aggiornata!")
+                        if update_password(target_user.strip(), new_pass_admin.strip()):
+                            st.success(f"Password di {target_user} aggiornata!")
                         else: st.error("Errore: Utente non trovato.")
-
             st.divider()
-            
             data = get_all_bookings_admin()
             if data:
                 for item in data:
@@ -311,11 +286,9 @@ else:
                         st.divider()
             else: st.info("Nessuna prenotazione.")
 
-        # --- VISTA STUDENTE ---
         elif st.session_state['role'] == 'student':
             next_l = calculate_next_lesson_number(st.session_state['username'])
             st.metric("Prossima Lezione", f"N° {next_l} di 8")
-
             with st.expander("➕ Nuova Prenotazione", expanded=True):
                 with st.form("bk_form"):
                     col1, col2 = st.columns(2)
@@ -327,24 +300,18 @@ else:
                             ok, msg = add_booking(st.session_state['username'], d, s)
                             if ok: st.success(f"Fatto! Lezione {msg}"); time.sleep(1); st.rerun()
                             else: st.warning(msg)
-
             st.subheader("Le tue Lezioni")
             my_b = get_my_bookings(st.session_state['username'])
-            
             GIORNI_IT = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-            
             if my_b:
                 for item in my_b:
-                    data_str = item['booking_date']
                     try:
-                        data_obj = datetime.strptime(data_str, "%Y-%m-%d")
-                        nome_giorno = GIORNI_IT[data_obj.weekday()]
+                        nome_giorno = GIORNI_IT[datetime.strptime(item['booking_date'], "%Y-%m-%d").weekday()]
                     except: nome_giorno = ""
-
                     with st.container():
                         c1, c2, c3 = st.columns([1,3,1])
                         c1.markdown(f"## {item['lesson_number']}")
-                        c2.markdown(f"**{nome_giorno} {data_str}**\n\n{item['slot']}")
+                        c2.markdown(f"**{nome_giorno} {item['booking_date']}**\n\n{item['slot']}")
                         if c3.button("Cancella", key=f"ud_{item['id']}"):
                             delete_booking_student(item['id'])
                             st.rerun()
@@ -356,10 +323,9 @@ else:
         notifiche = get_my_notifications(st.session_state['username'])
         if notifiche:
             for notif in notifiche:
-                data_grezza = notif['created_at']
                 try:
-                    data_obj = datetime.fromisoformat(data_grezza.replace('Z', '+00:00'))
+                    data_obj = datetime.fromisoformat(notif['created_at'].replace('Z', '+00:00'))
                     data_fmt = data_obj.strftime("%d/%m/%Y %H:%M")
-                except: data_fmt = data_grezza
+                except: data_fmt = notif['created_at']
                 st.info(f"📅 **{data_fmt}**\n\n{notif['message']}")
         else: st.write("📭 Nessun messaggio.")
