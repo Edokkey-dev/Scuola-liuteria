@@ -42,7 +42,6 @@ st.markdown("""
         font-weight: bold !important; 
         text-transform: uppercase !important;
     }
-    /* Forza testo bianco nei bottoni */
     .stButton > button p, .stButton > button span, .stButton > button div {
         color: #FFFFFF !important;
     }
@@ -75,7 +74,7 @@ st.markdown("""
         font-weight: bold !important;
     }
 
-    /* --- BOX CONTATORE LEZIONI (Fix Scritta Illeggibile) --- */
+    /* --- BOX CONTATORE LEZIONI --- */
     .counter-box {
         background-color: #1E1E1E; 
         padding: 30px; 
@@ -89,7 +88,7 @@ st.markdown("""
         margin: 0 !important;
         font-size: 2.5rem !important;
         font-family: 'Helvetica Neue', sans-serif !important;
-        text-shadow: 0px 0px 5px rgba(0,0,0,0.5); /* Ombra per staccare dal fondo */
+        text-shadow: 0px 0px 5px rgba(0,0,0,0.5);
     }
 
     /* --- CARDS --- */
@@ -190,11 +189,12 @@ def identify_user_onesignal(username):
         components.html(js, height=0)
     except: pass
 
-# --- FIX LOGICA: CALCOLO LEZIONE BASATO SUL DB ---
 def calculate_next_lesson_number(u):
     today = date.today().isoformat()
+    # Logica: se c'è una lezione futura, usa quel numero. Altrimenti prendi ultima passata + 1.
     future = supabase.table("bookings").select("lesson_number").eq("username", u).gte("booking_date", today).order("booking_date").limit(1).execute()
     if future.data: return future.data[0]['lesson_number']
+    
     past = supabase.table("bookings").select("lesson_number").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).limit(1).execute()
     if past.data: return (past.data[0]['lesson_number'] % 8) + 1
     return 1
@@ -206,12 +206,16 @@ def add_booking(u, d, s):
     n = calculate_next_lesson_number(u)
     try: supabase.table("bookings").insert({"username":u, "booking_date":sd, "slot":s, "lesson_number":n}).execute(); return True, n
     except: return False, "Errore"
+
 def get_future_bookings(u):
     today = date.today().isoformat()
     return supabase.table("bookings").select("*").eq("username", u).gte("booking_date", today).order("booking_date").execute().data
+
 def get_past_bookings(u):
     today = date.today().isoformat()
-    return supabase.table("bookings").select("*").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).execute().data
+    # MODIFICA: Include anche le lezioni di OGGI (lte invece di lt) così appaiono subito dopo
+    return supabase.table("bookings").select("*").eq("username", u).lte("booking_date", today).order("booking_date", desc=True).execute().data
+
 def get_all_future_bookings_admin():
     today = date.today().isoformat()
     return supabase.table("bookings").select("*").gte("booking_date", today).order("booking_date").execute().data
@@ -229,10 +233,7 @@ def get_student_details(u):
     return res.data[0] if res.data else None
 def assign_achievement_to_lesson(booking_id, student_username, achievement_name):
     try:
-        # 1. Scrivi il nome del premio nella prenotazione
         supabase.table("bookings").update({"achievement": achievement_name}).eq("id", booking_id).execute()
-        
-        # 2. Se è un premio valido, sblocca il badge nel profilo utente
         if achievement_name in ACHIEVEMENTS_MAP:
             col_db = ACHIEVEMENTS_MAP[achievement_name]
             supabase.table("users").update({col_db: True}).eq("username", student_username).execute()
@@ -337,13 +338,13 @@ else:
                 st.write("#### Storico & Premi")
                 past = get_past_bookings(sel_std)
                 
-                # SEZIONE ASSEGNAZIONE PREMI (RIPRISTINATA)
+                # LISTA LEZIONI PASSATE + ASSEGNAZIONE PREMI
                 if past:
                     for p in past:
                         curr = p.get('achievement')
                         ach_txt = f"🏆 {curr}" if curr else ""
                         
-                        # Card della lezione passata
+                        # Card Lezione
                         st.markdown(f"""
                         <div class='history-card {'special' if curr else ''}'>
                             <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>
@@ -351,7 +352,7 @@ else:
                             <b style='color:#1E1E1E'>{ach_txt}</b>
                         </div>""", unsafe_allow_html=True)
                         
-                        # Menu a tendina per assegnare premio
+                        # Menu Assegnazione
                         opts = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
                         idx = opts.index(curr) if curr in opts else 0
                         
@@ -362,7 +363,8 @@ else:
                             if st.button("OK", key=f"btn_{p['id']}"): 
                                 assign_achievement_to_lesson(p['id'], sel_std, (new_v if new_v != "Nessuno" else None))
                                 st.rerun()
-                else: st.info("Nessuna lezione passata.")
+                else: 
+                    st.warning("Nessuna lezione passata o odierna trovata per questo studente.")
 
     # --- STUDENT VIEW ---
     else:
