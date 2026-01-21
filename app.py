@@ -108,6 +108,7 @@ st.markdown("""
         border-radius: 2px; 
         margin-bottom: 10px; 
         border-left: 4px solid #999; 
+        color: #2C2C2C !important;
     }
     .history-card.special {
         background-color: #E0E0E0; 
@@ -191,22 +192,11 @@ def identify_user_onesignal(username):
 
 # --- FIX LOGICA: CALCOLO LEZIONE BASATO SUL DB ---
 def calculate_next_lesson_number(u):
-    # 1. Cerca se c'è una lezione futura prenotata (quindi attiva)
     today = date.today().isoformat()
     future = supabase.table("bookings").select("lesson_number").eq("username", u).gte("booking_date", today).order("booking_date").limit(1).execute()
-    
-    if future.data:
-        # Se c'è una lezione futura, usa QUEL numero (che l'admin può aver modificato)
-        return future.data[0]['lesson_number']
-    
-    # 2. Se non ci sono lezioni future, prendi l'ultima passata e aggiungi 1
+    if future.data: return future.data[0]['lesson_number']
     past = supabase.table("bookings").select("lesson_number").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).limit(1).execute()
-    
-    if past.data:
-        last_num = past.data[0]['lesson_number']
-        return (last_num % 8) + 1
-    
-    # 3. Se è nuovo studente
+    if past.data: return (past.data[0]['lesson_number'] % 8) + 1
     return 1
 
 def add_booking(u, d, s):
@@ -239,7 +229,10 @@ def get_student_details(u):
     return res.data[0] if res.data else None
 def assign_achievement_to_lesson(booking_id, student_username, achievement_name):
     try:
+        # 1. Scrivi il nome del premio nella prenotazione
         supabase.table("bookings").update({"achievement": achievement_name}).eq("id", booking_id).execute()
+        
+        # 2. Se è un premio valido, sblocca il badge nel profilo utente
         if achievement_name in ACHIEVEMENTS_MAP:
             col_db = ACHIEVEMENTS_MAP[achievement_name]
             supabase.table("users").update({col_db: True}).eq("username", student_username).execute()
@@ -330,6 +323,7 @@ else:
             if sel_std:
                 me = get_student_details(sel_std)
                 
+                # SEZIONE RECUPERI
                 st.markdown("### 🟠 Recuperi")
                 col_rec1, col_rec2 = st.columns([1, 2])
                 with col_rec1:
@@ -342,19 +336,32 @@ else:
                 st.divider()
                 st.write("#### Storico & Premi")
                 past = get_past_bookings(sel_std)
+                
+                # SEZIONE ASSEGNAZIONE PREMI (RIPRISTINATA)
                 if past:
                     for p in past:
                         curr = p.get('achievement')
                         ach_txt = f"🏆 {curr}" if curr else ""
-                        st.markdown(f"<div class='history-card {'special' if curr else ''}'><b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} <br><b style='color:#1E1E1E'>{ach_txt}</b></div>", unsafe_allow_html=True)
                         
+                        # Card della lezione passata
+                        st.markdown(f"""
+                        <div class='history-card {'special' if curr else ''}'>
+                            <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>
+                            {p['slot']} <br>
+                            <b style='color:#1E1E1E'>{ach_txt}</b>
+                        </div>""", unsafe_allow_html=True)
+                        
+                        # Menu a tendina per assegnare premio
                         opts = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
                         idx = opts.index(curr) if curr in opts else 0
+                        
                         c_a1, c_a2 = st.columns([2,1])
-                        with c_a1: new_v = st.selectbox("Assegna Premio:", opts, index=idx, key=f"sel_{p['id']}", label_visibility="collapsed")
-                        with c_a2: 
+                        with c_a1:
+                            new_v = st.selectbox("Assegna Premio:", opts, index=idx, key=f"sel_{p['id']}", label_visibility="collapsed")
+                        with c_a2:
                             if st.button("OK", key=f"btn_{p['id']}"): 
-                                assign_achievement_to_lesson(p['id'], sel_std, (new_v if new_v != "Nessuno" else None)); st.rerun()
+                                assign_achievement_to_lesson(p['id'], sel_std, (new_v if new_v != "Nessuno" else None))
+                                st.rerun()
                 else: st.info("Nessuna lezione passata.")
 
     # --- STUDENT VIEW ---
@@ -369,7 +376,7 @@ else:
             
             nxt = calculate_next_lesson_number(st.session_state['username'])
             
-            # --- BOX LEZIONE (Testo Bianco) ---
+            # Box Lezione
             st.markdown(f"""
             <div class='counter-box'>
                 <h2>LEZIONE {nxt} / 8</h2>
