@@ -1,3 +1,14 @@
+Hai perfettamente ragione. Avere tutti quei bottoni e caselle sempre visibili crea confusione e "sporca" il design del registro.
+
+Ho ridisegnato la sezione **Registro (Admin)** seguendo la tua richiesta:
+
+1. **Pulizia:** Ora vedi solo la Card con il nome e l'orario.
+2. **L'icona Matita:** Sotto ogni card c'è un menu a tendina (Expander) con scritto **"✏️ Modifica"**.
+3. **Il Pannello Nascosto:** Cliccando sulla matita, si apre il pannello dove puoi modificare il numero della lezione o eliminarla.
+
+Ecco il codice completo aggiornato. Sostituisci tutto in `app.py`.
+
+```python
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -12,13 +23,13 @@ import os
 # --- 1. CONFIGURAZIONE PAGINA & CSS "SAN BARNABA" ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- CSS DEFINITIVO (Fix per scritte invisibili) ---
+# --- CSS DEFINITIVO (Massimo Contrasto & Design Pulito) ---
 st.markdown("""
 <style>
     /* Sfondo Generale */
     .stApp { background-color: #FAF9F6; }
     
-    /* Font e Testi */
+    /* Font e Testi Base */
     h1, h2, h3, h4, p, span, label, div { 
         color: #2C2C2C; 
         font-family: 'Georgia', serif; 
@@ -29,7 +40,7 @@ st.markdown("""
         background-color: #1E1E1E !important; 
         border-right: 1px solid #C0A062; 
     }
-    [data-testid="stSidebar"] * { color: #E0E0E0 !important; }
+    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
     /* Login Box */
     [data-testid="stForm"] { 
@@ -43,29 +54,39 @@ st.markdown("""
     /* Input Fields */
     .stTextInput > div > div > input, .stDateInput > div > div > input, .stNumberInput > div > div > input, div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important; 
-        color: #333 !important; 
+        color: #000000 !important; 
         border: 1px solid #ccc !important; 
-        border-radius: 2px !important;
+        border-radius: 2px !important; 
     }
     
-    /* BOTTONE PRENOTA E ALTRI (Fix Testo Invisibile) */
+    /* BOTTONI (Bianco su Scuro) */
     .stButton > button { 
-        background-color: #1E1E1E !important; /* Nero/Marrone scuro come il box */
-        color: #C0A062 !important; /* Testo ORO brillante */
+        background-color: #1E1E1E !important; 
+        color: #FFFFFF !important; 
         border-radius: 4px !important; 
         width: 100%; 
         font-weight: bold !important; 
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        border: 1px solid #C0A062 !important;
-        height: 3em;
+        letter-spacing: 1px; 
+        text-transform: uppercase; 
+        border: 1px solid #C0A062 !important; 
+        height: 3em; 
     }
     .stButton > button:hover { 
         background-color: #C0A062 !important; 
-        color: #1E1E1E !important;
+        color: #FFFFFF !important; 
+        border: 1px solid #1E1E1E !important; 
     }
 
-    /* BOX CONTATORE LEZIONI (Fix Testo Invisibile) */
+    /* Expander (La tendina della matita) */
+    .streamlit-expanderHeader {
+        background-color: white;
+        color: #C0A062 !important;
+        font-weight: bold;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    /* BOX CONTATORE LEZIONI */
     .counter-box {
         background-color: #1E1E1E; 
         padding: 30px; 
@@ -75,7 +96,7 @@ st.markdown("""
         border: 1px solid #C0A062;
     }
     .counter-box h2 {
-        color: #C0A062 !important; /* ORO brillante su fondo nero */
+        color: #FFFFFF !important; 
         margin: 0;
         font-family: 'Helvetica Neue', sans-serif;
         font-size: 2.5rem;
@@ -84,23 +105,24 @@ st.markdown("""
     /* Alert Recuperi */
     .recovery-alert {
         background-color: #FFF3E0;
-        border: 1px solid #FFB74D;
+        border: 2px solid #E65100;
         color: #E65100;
-        padding: 10px;
+        padding: 12px;
         border-radius: 4px;
         text-align: center;
         font-weight: bold;
         margin-bottom: 15px;
     }
 
-    /* Card Storico */
+    /* Card Storico e Admin */
     .booking-card { 
         background-color: white; 
-        padding: 15px; 
-        border-radius: 2px; 
-        border-left: 4px solid #C0A062; 
-        margin-bottom: 15px; 
+        padding: 20px; 
+        border-radius: 4px; 
+        border-left: 5px solid #C0A062; 
+        margin-bottom: 5px; /* Ridotto margine inferiore per attaccare la tendina */
         box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        color: #333;
     }
     .history-card { 
         background-color: #F4F4F4; 
@@ -108,6 +130,13 @@ st.markdown("""
         border-radius: 2px; 
         margin-bottom: 10px; 
         border-left: 4px solid #999; 
+    }
+    .achievement-tag {
+        background-color: #C0A062;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.8em;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -124,17 +153,12 @@ def init_connection():
 supabase = init_connection()
 cookie_manager = stx.CookieManager()
 
-# --- DIZIONARIO OBIETTIVI ---
 ACHIEVEMENTS_MAP = {
-    "Rosetta 🏵️": "ach_rosetta",
-    "Ponte 🌉": "ach_ponte",
-    "Assemblata 🔧": "ach_assemblata",
-    "Manico 🪵": "ach_manico",
-    "Corpo 🎸": "ach_corpo",
-    "Chitarra Finita 🏆": "ach_finita"
+    "Rosetta 🏵️": "ach_rosetta", "Ponte 🌉": "ach_ponte", "Assemblata 🔧": "ach_assemblata",
+    "Manico 🪵": "ach_manico", "Corpo 🎸": "ach_corpo", "Chitarra Finita 🏆": "ach_finita"
 }
 
-# --- FUNZIONI UTILI ---
+# --- FUNZIONI ---
 def hash_password(p): return hashlib.sha256(str.encode(p)).hexdigest()
 def verify_user(u, p):
     res = supabase.table("users").select("*").eq("username", u).eq("password", hash_password(p)).execute()
@@ -147,11 +171,9 @@ def identify_user_onesignal(username):
         js = f"""<script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script><script>window.OneSignal = window.OneSignal || [];OneSignal.push(function() {{OneSignal.init({{ appId: "{st.secrets["onesignal"]["app_id"]}", allowLocalhostAsSecureOrigin: true, autoRegister: true }});OneSignal.push(function() {{ OneSignal.setExternalUserId("{username}"); }});}});</script>"""
         components.html(js, height=0)
     except: pass
-
 def calculate_next_lesson_number(u):
     res = supabase.table("bookings").select("*", count="exact").eq("username", u).execute()
     return (res.count % 8) + 1
-
 def add_booking(u, d, s):
     sd = d.strftime("%Y-%m-%d")
     check = supabase.table("bookings").select("*").eq("username", u).eq("booking_date", sd).eq("slot", s).execute()
@@ -159,40 +181,27 @@ def add_booking(u, d, s):
     n = calculate_next_lesson_number(u)
     try: supabase.table("bookings").insert({"username":u, "booking_date":sd, "slot":s, "lesson_number":n}).execute(); return True, n
     except: return False, "Errore"
-
 def get_future_bookings(u):
     today = date.today().isoformat()
     return supabase.table("bookings").select("*").eq("username", u).gte("booking_date", today).order("booking_date").execute().data
-
 def get_past_bookings(u):
     today = date.today().isoformat()
     return supabase.table("bookings").select("*").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).execute().data
-
 def get_all_future_bookings_admin():
     today = date.today().isoformat()
     return supabase.table("bookings").select("*").gte("booking_date", today).order("booking_date").execute().data
-
 def delete_booking(bid): supabase.table("bookings").delete().eq("id", bid).execute()
-
 def update_lesson_number(booking_id, new_number):
-    try:
-        supabase.table("bookings").update({"lesson_number": new_number}).eq("id", booking_id).execute()
-        return True
+    try: supabase.table("bookings").update({"lesson_number": new_number}).eq("id", booking_id).execute(); return True
     except: return False
-
 def update_recovery_count(username, new_count):
-    try:
-        supabase.table("users").update({"recovery_lessons": new_count}).eq("username", username).execute()
-        return True
+    try: supabase.table("users").update({"recovery_lessons": new_count}).eq("username", username).execute(); return True
     except: return False
-
 def get_all_students():
     return supabase.table("users").select("username").eq("role", "student").execute().data
-
 def get_student_details(u):
     res = supabase.table("users").select("*").eq("username", u).execute()
     return res.data[0] if res.data else None
-
 def assign_achievement_to_lesson(booking_id, student_username, achievement_name):
     try:
         supabase.table("bookings").update({"achievement": achievement_name}).eq("id", booking_id).execute()
@@ -205,10 +214,8 @@ def assign_achievement_to_lesson(booking_id, student_username, achievement_name)
 # --- HEADER ---
 col_logo_1, col_logo_2, col_logo_3 = st.columns([1, 2, 1])
 with col_logo_2:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", use_column_width=True)
-    else:
-        st.markdown("<h1 style='text-align: center; color:#2C2C2C;'>Liuteria San Barnaba</h1>", unsafe_allow_html=True)
+    if os.path.exists("logo.png"): st.image("logo.png", use_column_width=True)
+    else: st.markdown("<h1 style='text-align: center; color:#2C2C2C;'>Liuteria San Barnaba</h1>", unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state: st.session_state.update({'logged_in': False, 'username': '', 'role': ''})
 
@@ -240,12 +247,11 @@ if not st.session_state['logged_in']:
                         if add_user(nu, np, r): st.success("Fatto! Accedi.")
                         else: st.error("Esiste già")
 
-# APP INTERNA
+# APP
 else:
     identify_user_onesignal(st.session_state['username'])
     with st.sidebar:
-        if os.path.exists("sidebar.jpg"):
-            st.image("sidebar.jpg", use_column_width=True)
+        if os.path.exists("sidebar.jpg"): st.image("sidebar.jpg", use_column_width=True)
         st.markdown(f"### 👤 {st.session_state['username'].upper()}")
         if st.session_state['role'] == 'student':
             me_sidebar = get_student_details(st.session_state['username'])
@@ -261,19 +267,31 @@ else:
             data = get_all_future_bookings_admin()
             if data:
                 for x in data:
-                    with st.container():
-                        st.markdown(f"<div class='booking-card' style='margin-bottom:0px;'><b>👤 {x['username']}</b><br>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
-                        c1, c2, c3 = st.columns([2, 1, 1])
-                        with c1: new_num = st.number_input("N° Lez.", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
-                        with c2: 
-                            if st.button("💾", key=f"s_{x['id']}"): 
+                    # SCHEDA VISIBILE
+                    st.markdown(f"""
+                    <div class='booking-card'>
+                        <span style='font-size:1.2em; font-weight:bold;'>👤 {x['username']}</span><br>
+                        📅 {x['booking_date']} | 🕒 {x['slot']} <br>
+                        Lezione attuale: <b>{x['lesson_number']}</b>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # TENDINA MODIFICA (Pencil Icon)
+                    with st.expander("✏️ Gestisci Prenotazione"):
+                        c1, c2 = st.columns([1, 1])
+                        with c1:
+                            new_num = st.number_input("Cambia Numero Lezione", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
+                            if st.button("💾 SALVA MODIFICHE", key=f"s_{x['id']}"):
                                 update_lesson_number(x['id'], new_num)
                                 st.rerun()
-                        with c3:
-                            if st.button("🗑️", key=f"d_{x['id']}"): 
+                        with c2:
+                            st.write("") # Spaziatore
+                            st.write("")
+                            if st.button("🗑️ ELIMINA PRENOTAZIONE", key=f"d_{x['id']}"):
                                 delete_booking(x['id'])
                                 st.rerun()
-                        st.markdown("---")
+            else: st.info("Nessuna prenotazione.")
+
         with tab_std:
             st.subheader("Gestione Carriera")
             students = [s['username'] for s in get_all_students()]
@@ -348,3 +366,5 @@ else:
             for p in past:
                 ach = p.get('achievement')
                 st.markdown(f"<div class='history-card { 'special' if ach else '' }'>✅ <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} {('<span class=\"achievement-tag\">🏆 '+ach+'</span>') if ach else ''}</div>", unsafe_allow_html=True)
+
+```
