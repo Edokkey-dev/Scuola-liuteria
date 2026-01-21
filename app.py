@@ -12,10 +12,10 @@ import os
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- 2. CSS DARK GREY & WHITE (Alto Contrasto) ---
+# --- 2. CSS DEFINITIVO (Bottoni Leggibili + Box Carriera Ripristinati) ---
 st.markdown("""
 <style>
-    /* Sfondo Generale Pagina (Chiaro per contrasto con i box scuri) */
+    /* Sfondo Generale */
     .stApp { background-color: #FAF9F6; }
     
     /* Font Base */
@@ -24,15 +24,14 @@ st.markdown("""
         color: #2C2C2C;
     }
 
-    /* --- SIDEBAR (Grigio Scuro) --- */
+    /* --- SIDEBAR --- */
     [data-testid="stSidebar"] { 
         background-color: #1E1E1E !important; 
-        border-right: 1px solid #444; 
+        border-right: 1px solid #C0A062; 
     }
-    /* Testo Sidebar BIANCO */
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* --- BOTTONI (Grigio Scuro con Scritta BIANCA) --- */
+    /* --- BOTTONI (Grigio Scuro con Scritta BIANCA FORZATA) --- */
     .stButton > button { 
         background-color: #1E1E1E !important; 
         color: #FFFFFF !important; 
@@ -43,15 +42,17 @@ st.markdown("""
         font-weight: bold !important; 
         text-transform: uppercase !important;
     }
-    /* Forza il colore del testo BIANCO dentro i bottoni */
+    /* Forza il colore del testo BIANCO dentro i bottoni (per icone e paragrafi) */
     .stButton > button p, .stButton > button span, .stButton > button div {
         color: #FFFFFF !important;
     }
-    
     /* Hover Bottoni */
     .stButton > button:hover { 
-        background-color: #333333 !important; 
-        border-color: #FFFFFF !important;
+        background-color: #C0A062 !important; 
+        border-color: #1E1E1E !important;
+    }
+    .stButton > button:hover p {
+        color: #1E1E1E !important;
     }
 
     /* --- EXPANDER / TENDINA (Grigio Scuro) --- */
@@ -61,28 +62,24 @@ st.markdown("""
         border-radius: 4px !important;
         color: #FFFFFF !important;
     }
-    /* Icona freccetta e testo header BIANCHI */
     .streamlit-expanderHeader p, .streamlit-expanderHeader span, .streamlit-expanderHeader svg {
         color: #FFFFFF !important;
         fill: #FFFFFF !important;
     }
     
-    /* --- INPUT FIELDS (Bianchi con testo Nero per leggibilità) --- */
+    /* --- INPUT FIELDS --- */
     .stTextInput > div > div > input, .stNumberInput > div > div > input {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 1px solid #ccc !important;
     }
-    
-    /* Testo dentro le Selectbox (Menu a tendina) */
     div[data-baseweb="select"] * { color: #FFFFFF !important; } 
-    /* Etichette sopra gli input */
     .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
         color: #2C2C2C !important;
         font-weight: bold !important;
     }
 
-    /* --- BOX CONTATORE LEZIONI (Grigio Scuro) --- */
+    /* --- BOX CONTATORE LEZIONI --- */
     .counter-box {
         background-color: #1E1E1E; 
         padding: 30px; 
@@ -97,7 +94,7 @@ st.markdown("""
         font-size: 2.5rem !important;
     }
 
-    /* --- CARDS --- */
+    /* --- CARDS (Agenda e Storico) --- */
     .booking-card { 
         background-color: white; 
         padding: 20px; 
@@ -132,6 +129,26 @@ st.markdown("""
         margin-bottom: 20px;
         font-size: 1.2rem;
     }
+    
+    /* --- BOX MEDAGLIE CARRIERA (RIPRISTINATO) --- */
+    .ach-box { 
+        background-color: #FFFFFF; 
+        border-radius: 6px; 
+        padding: 15px; 
+        text-align: center; 
+        margin-bottom: 15px; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        border: 1px solid #CCC;
+    }
+    .ach-icon { font-size: 2rem; display: block; margin-bottom: 5px; }
+    .ach-title { font-size: 0.9rem; font-weight: bold; text-transform: uppercase; color: #2C2C2C; }
+    
+    .rank-bronze { border-bottom: 4px solid #CD7F32; }
+    .rank-gold { border-bottom: 4px solid #FFD700; }
+    .rank-platinum { border-bottom: 4px solid #E5E4E2; background: linear-gradient(to bottom right, #fff, #f0f0f0); }
+
+    .ach-locked { opacity: 0.4; filter: grayscale(100%); }
+    .ach-unlocked { opacity: 1; }
     
     /* Login Box */
     [data-testid="stForm"] { 
@@ -277,7 +294,7 @@ else:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    with st.expander("✏️ MODIFICA / ELIMINA"):
+                    with st.expander("✏️ Modifica / Elimina"):
                         new_n = st.number_input("Numero Lezione", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
                         c1, c2 = st.columns(2)
                         with c1:
@@ -351,27 +368,34 @@ else:
                 st.markdown(f"<div class='booking-card'>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
                 if st.button("ANNULLA", key=x['id']): delete_booking(x['id']); st.rerun()
 
-        # 2. Carriera
+        # 2. Carriera (Layout Ripristinato a Box)
         with tab_carr:
             me = get_student_details(st.session_state['username'])
-            def show_badge(col, title, active, icon):
+            
+            def show_badge(col, title, active, icon, rank_class):
                 stt = "ach-unlocked" if active else "ach-locked"
                 ico = icon if active else "🔒"
-                col.markdown(f"<div class='ach-box {stt}'><span class='ach-icon'>{ico}</span><span class='ach-title'>{title}</span></div>", unsafe_allow_html=True)
+                # Qui usiamo la classe CSS .ach-box definita sopra per ricreare i riquadri
+                col.markdown(f"""
+                <div class='ach-box {rank_class} {stt}'>
+                    <span class='ach-icon'>{ico}</span>
+                    <span class='ach-title'>{title}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
             st.write("🥉 **ELEMENTI BASE**")
             b1, b2, b3 = st.columns(3)
-            show_badge(b1, "Rosetta", me.get('ach_rosetta'), "🏵️")
-            show_badge(b2, "Ponte", me.get('ach_ponte'), "🌉")
-            show_badge(b3, "Assemblaggio", me.get('ach_assemblata'), "🔧")
+            show_badge(b1, "Rosetta", me.get('ach_rosetta'), "🏵️", "rank-bronze")
+            show_badge(b2, "Ponte", me.get('ach_ponte'), "🌉", "rank-bronze")
+            show_badge(b3, "Assemblaggio", me.get('ach_assemblata'), "🔧", "rank-bronze")
 
             st.write("🥇 **STRUTTURA**")
             g1, g2 = st.columns(2)
-            show_badge(g1, "Manico", me.get('ach_manico'), "🪵")
-            show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸")
+            show_badge(g1, "Manico", me.get('ach_manico'), "🪵", "rank-gold")
+            show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸", "rank-gold")
 
-            st.write("💎 **FINITA**")
-            p1 = st.columns(1)[0]; show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆")
+            st.write("💎 **MAESTRO**")
+            p1 = st.columns(1)[0]; show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆", "rank-platinum")
             
             st.divider()
             st.subheader("Il tuo Percorso")
