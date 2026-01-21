@@ -12,7 +12,7 @@ import os
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- 2. CSS DARK GREY & WHITE (Alto Contrasto) ---
+# --- 2. CSS DARK GREY & WHITE (Alto Contrasto & Fix Leggibilità) ---
 st.markdown("""
 <style>
     /* Sfondo Generale */
@@ -75,7 +75,7 @@ st.markdown("""
         font-weight: bold !important;
     }
 
-    /* --- BOX CONTATORE LEZIONI --- */
+    /* --- BOX CONTATORE LEZIONI (Fix Scritta Illeggibile) --- */
     .counter-box {
         background-color: #1E1E1E; 
         padding: 30px; 
@@ -84,10 +84,12 @@ st.markdown("""
         margin-bottom: 25px; 
         border: 1px solid #555;
     }
-    .counter-box h2 {
+    .counter-box h2, .counter-box span, .counter-box div {
         color: #FFFFFF !important; 
         margin: 0 !important;
         font-size: 2.5rem !important;
+        font-family: 'Helvetica Neue', sans-serif !important;
+        text-shadow: 0px 0px 5px rgba(0,0,0,0.5); /* Ombra per staccare dal fondo */
     }
 
     /* --- CARDS --- */
@@ -186,9 +188,27 @@ def identify_user_onesignal(username):
         js = f"""<script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script><script>window.OneSignal = window.OneSignal || [];OneSignal.push(function() {{OneSignal.init({{ appId: "{st.secrets["onesignal"]["app_id"]}", allowLocalhostAsSecureOrigin: true, autoRegister: true }});OneSignal.push(function() {{ OneSignal.setExternalUserId("{username}"); }});}});</script>"""
         components.html(js, height=0)
     except: pass
+
+# --- FIX LOGICA: CALCOLO LEZIONE BASATO SUL DB ---
 def calculate_next_lesson_number(u):
-    res = supabase.table("bookings").select("*", count="exact").eq("username", u).execute()
-    return (res.count % 8) + 1
+    # 1. Cerca se c'è una lezione futura prenotata (quindi attiva)
+    today = date.today().isoformat()
+    future = supabase.table("bookings").select("lesson_number").eq("username", u).gte("booking_date", today).order("booking_date").limit(1).execute()
+    
+    if future.data:
+        # Se c'è una lezione futura, usa QUEL numero (che l'admin può aver modificato)
+        return future.data[0]['lesson_number']
+    
+    # 2. Se non ci sono lezioni future, prendi l'ultima passata e aggiungi 1
+    past = supabase.table("bookings").select("lesson_number").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).limit(1).execute()
+    
+    if past.data:
+        last_num = past.data[0]['lesson_number']
+        return (last_num % 8) + 1
+    
+    # 3. Se è nuovo studente
+    return 1
+
 def add_booking(u, d, s):
     sd = d.strftime("%Y-%m-%d")
     check = supabase.table("bookings").select("*").eq("username", u).eq("booking_date", sd).eq("slot", s).execute()
@@ -243,19 +263,12 @@ if not st.session_state['logged_in']:
             with st.form("log"):
                 u = st.text_input("Username").strip()
                 p = st.text_input("Password", type='password').strip()
-                
-                # --- FUNZIONE RICORDAMI REINSERITA ---
                 rem = st.checkbox("Ricordami")
-                
                 if st.form_submit_button("ENTRA"):
                     ud = verify_user(u, p)
                     if ud:
                         st.session_state.update({'logged_in':True, 'username':u, 'role':ud['role']})
-                        
-                        # Se la spunta è attiva, salva il cookie
-                        if rem:
-                            cookie_manager.set("scuola_user_session", u, expires_at=datetime.now()+timedelta(days=30))
-                        
+                        if rem: cookie_manager.set("scuola_user_session", u, expires_at=datetime.now()+timedelta(days=30))
                         st.rerun()
                     else: st.error("Dati errati")
         with t2:
@@ -355,7 +368,12 @@ else:
             if rec > 0: st.markdown(f"<div class='recovery-alert'>⚠️ HAI {rec} LEZIONI DA RECUPERARE</div>", unsafe_allow_html=True)
             
             nxt = calculate_next_lesson_number(st.session_state['username'])
-            st.markdown(f"<div class='counter-box'><h2>LEZIONE {nxt} / 8</h2></div>", unsafe_allow_html=True)
+            
+            # --- BOX LEZIONE (Testo Bianco) ---
+            st.markdown(f"""
+            <div class='counter-box'>
+                <h2>LEZIONE {nxt} / 8</h2>
+            </div>""", unsafe_allow_html=True)
             
             with st.form("new_bk"):
                 d = st.date_input("Data", min_value=date.today())
