@@ -12,128 +12,139 @@ import os
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- 2. CSS RIPULITO E ELEGANTE (SAN BARNABA STYLE) ---
+# --- 2. CSS DARK GREY & WHITE (Alto Contrasto) ---
 st.markdown("""
 <style>
-    /* Sfondo Generale - Crema */
+    /* Sfondo Generale Pagina (Chiaro per contrasto con i box scuri) */
     .stApp { background-color: #FAF9F6; }
     
-    /* Testi Generali - Grigio Scuro Elegante */
+    /* Font Base */
     h1, h2, h3, h4, p, span, label, div { 
         font-family: 'Georgia', serif; 
         color: #2C2C2C;
     }
 
-    /* --- SIDEBAR --- */
+    /* --- SIDEBAR (Grigio Scuro) --- */
     [data-testid="stSidebar"] { 
-        background-color: #2C1B14 !important; /* Marrone Liuteria */
-        border-right: 2px solid #C0A062; 
+        background-color: #1E1E1E !important; 
+        border-right: 1px solid #444; 
     }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p { 
-        color: #F0F0F0 !important; 
-    }
+    /* Testo Sidebar BIANCO */
+    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* --- BOTTONI (Marrone Scuro con Scritta BIANCA) --- */
+    /* --- BOTTONI (Grigio Scuro con Scritta BIANCA) --- */
     .stButton > button { 
-        background-color: #2C1B14 !important; 
-        border: 1px solid #C0A062 !important; 
+        background-color: #1E1E1E !important; 
+        color: #FFFFFF !important; 
+        border: 1px solid #555 !important; 
         border-radius: 4px !important; 
-        height: 3em !important;
+        height: 3.5em !important;
         width: 100% !important;
+        font-weight: bold !important; 
+        text-transform: uppercase !important;
     }
-    /* FORZA IL COLORE DEL TESTO DENTRO I BOTTONI */
-    .stButton > button p, .stButton > button div {
+    /* Forza il colore del testo BIANCO dentro i bottoni */
+    .stButton > button p, .stButton > button span, .stButton > button div {
         color: #FFFFFF !important;
-        font-weight: bold !important;
-        letter-spacing: 1px;
-        text-transform: uppercase;
     }
-    /* Hover */
+    
+    /* Hover Bottoni */
     .stButton > button:hover { 
-        background-color: #C0A062 !important; 
-        border-color: #2C1B14 !important;
-    }
-    .stButton > button:hover p {
-        color: #2C1B14 !important;
+        background-color: #333333 !important; 
+        border-color: #FFFFFF !important;
     }
 
-    /* --- BOX CONTATORE LEZIONI --- */
+    /* --- EXPANDER / TENDINA (Grigio Scuro) --- */
+    .streamlit-expanderHeader {
+        background-color: #1E1E1E !important;
+        border: 1px solid #555 !important;
+        border-radius: 4px !important;
+        color: #FFFFFF !important;
+    }
+    /* Icona freccetta e testo header BIANCHI */
+    .streamlit-expanderHeader p, .streamlit-expanderHeader span, .streamlit-expanderHeader svg {
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
+    }
+    
+    /* --- INPUT FIELDS (Bianchi con testo Nero per leggibilità) --- */
+    .stTextInput > div > div > input, .stNumberInput > div > div > input {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #ccc !important;
+    }
+    
+    /* Testo dentro le Selectbox (Menu a tendina) */
+    div[data-baseweb="select"] * { color: #FFFFFF !important; } 
+    /* Etichette sopra gli input */
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
+        color: #2C2C2C !important;
+        font-weight: bold !important;
+    }
+
+    /* --- BOX CONTATORE LEZIONI (Grigio Scuro) --- */
     .counter-box {
-        background-color: #2C1B14; 
-        padding: 25px; 
+        background-color: #1E1E1E; 
+        padding: 30px; 
         border-radius: 4px; 
         text-align: center; 
         margin-bottom: 25px; 
-        border: 2px solid #C0A062;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        border: 1px solid #555;
     }
     .counter-box h2 {
         color: #FFFFFF !important; 
         margin: 0 !important;
-        font-size: 2.2rem !important;
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-
-    /* --- ALERT RECUPERI --- */
-    .recovery-alert {
-        background-color: #FFF3E0;
-        border: 1px solid #FF9800;
-        color: #E65100;
-        padding: 15px;
-        border-radius: 4px;
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 20px;
-        font-size: 1.1rem;
+        font-size: 2.5rem !important;
     }
 
     /* --- CARDS --- */
     .booking-card { 
-        background-color: #FFFFFF; 
+        background-color: white; 
         padding: 20px; 
         border-radius: 4px; 
-        border-left: 6px solid #C0A062; 
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
-        margin-bottom: 10px;
+        border-left: 6px solid #1E1E1E; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        margin-bottom: 5px;
         color: #2C2C2C !important;
     }
     .history-card { 
         background-color: #F4F4F4; 
         padding: 15px; 
         border-radius: 2px; 
-        margin-bottom: 8px; 
+        margin-bottom: 10px; 
         border-left: 4px solid #999; 
     }
     .history-card.special {
-        background-color: #FFFAF0; 
-        border-left: 4px solid #C0A062; 
-        border: 1px solid #FFE0B2;
+        background-color: #E0E0E0; 
+        border-left: 4px solid #1E1E1E; 
+        border: 1px solid #999;
     }
 
-    /* --- BADGES (Medaglie) --- */
-    .ach-box { 
-        background-color: #FFFFFF; 
-        border-radius: 6px; 
-        padding: 15px; 
-        text-align: center; 
-        margin-bottom: 15px; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-        border: 1px solid #EEE;
+    /* --- ALERT RECUPERI --- */
+    .recovery-alert {
+        background-color: #FFEBEE;
+        border: 2px solid #D32F2F;
+        color: #C62828;
+        padding: 15px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 20px;
+        font-size: 1.2rem;
     }
-    .ach-icon { font-size: 2rem; display: block; margin-bottom: 5px; }
-    .ach-title { font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
-    .ach-locked { opacity: 0.3; filter: grayscale(100%); }
-    .ach-unlocked { opacity: 1; border-color: #C0A062; background-color: #FFFAF0; }
     
-    /* INPUTS */
-    .stTextInput input, .stNumberInput input, .stDateInput input {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
+    /* Login Box */
+    [data-testid="stForm"] { 
+        background-color: #FFFFFF; 
+        padding: 40px; 
+        border-radius: 4px; 
+        border-top: 5px solid #1E1E1E; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. BACKEND ---
+# --- 3. BACKEND & SUPABASE ---
 try: ADMIN_KEY = st.secrets["admin_password"]
 except: st.error("Errore Secrets."); st.stop()
 
@@ -266,7 +277,7 @@ else:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    with st.expander("✏️ Modifica / Elimina"):
+                    with st.expander("✏️ MODIFICA / ELIMINA"):
                         new_n = st.number_input("Numero Lezione", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
                         c1, c2 = st.columns(2)
                         with c1:
@@ -302,7 +313,7 @@ else:
                     for p in past:
                         curr = p.get('achievement')
                         ach_txt = f"🏆 {curr}" if curr else ""
-                        st.markdown(f"<div class='history-card {'special' if curr else ''}'><b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} <br><b style='color:#C0A062'>{ach_txt}</b></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='history-card {'special' if curr else ''}'><b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} <br><b style='color:#1E1E1E'>{ach_txt}</b></div>", unsafe_allow_html=True)
                         
                         opts = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
                         idx = opts.index(curr) if curr in opts else 0
@@ -359,7 +370,7 @@ else:
             show_badge(g1, "Manico", me.get('ach_manico'), "🪵")
             show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸")
 
-            st.write("💎 **MAESTRO**")
+            st.write("💎 **FINITA**")
             p1 = st.columns(1)[0]; show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆")
             
             st.divider()
@@ -368,6 +379,6 @@ else:
             if past:
                 for p in past:
                     ach = p.get('achievement')
-                    ach_txt = f"<br><b style='color:#C0A062'>🏆 {ach}</b>" if ach else ""
+                    ach_txt = f"<br><b style='color:#1E1E1E'>🏆 {ach}</b>" if ach else ""
                     st.markdown(f"<div class='history-card {'special' if ach else ''}'>✅ <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} {ach_txt}</div>", unsafe_allow_html=True)
             else: st.write("Nessuna lezione conclusa.")
