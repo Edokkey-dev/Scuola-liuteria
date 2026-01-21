@@ -457,4 +457,19 @@ else:
             
             st.divider()
             
-            st.subheader("Il
+            st.subheader("Il tuo Percorso")
+            past = get_past_bookings(st.session_state['username'])
+            if past:
+                for p in past:
+                    is_special = p.get('achievement') is not None
+                    ach_html = f"<span class='achievement-tag'>🏆 {p['achievement']}</span>" if is_special else ""
+                    cls_special = "special" if is_special else ""
+                    
+                    st.markdown(f"""
+                    <div class='history-card {cls_special}'>
+                        ✅ <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>
+                        {p['slot']} {ach_html}
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.write("Nessuna lezione passata.")
