@@ -9,10 +9,9 @@ from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 import os
 
-# --- 1. CONFIGURAZIONE PAGINA & CSS "SAN BARNABA" ---
+# --- 1. CONFIGURAZIONE PAGINA & CSS "ULTRA CONTRASTO" ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- CSS DEFINITIVO (Massimo Contrasto & Design Pulito) ---
 st.markdown("""
 <style>
     /* Sfondo Generale */
@@ -31,48 +30,47 @@ st.markdown("""
     }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* Login Box */
-    [data-testid="stForm"] { 
-        background-color: #FFFFFF; 
-        padding: 40px; 
-        border-radius: 4px; 
-        border-top: 5px solid #C0A062; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
-    }
-    
-    /* Input Fields */
-    .stTextInput > div > div > input, .stDateInput > div > div > input, .stNumberInput > div > div > input, div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important; 
-        color: #000000 !important; 
-        border: 1px solid #ccc !important; 
-        border-radius: 2px !important; 
-    }
-    
-    /* BOTTONI (Bianco su Scuro) */
+    /* BOTTONI GENERALI E ADMIN (Fix Scritte Nere) */
     .stButton > button { 
         background-color: #1E1E1E !important; 
-        color: #FFFFFF !important; 
+        color: #FFFFFF !important; /* FORZA BIANCO */
         border-radius: 4px !important; 
         width: 100%; 
         font-weight: bold !important; 
-        letter-spacing: 1px; 
         text-transform: uppercase; 
         border: 1px solid #C0A062 !important; 
-        height: 3em; 
+        height: 3.5em !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    .stButton > button:hover { 
-        background-color: #C0A062 !important; 
-        color: #FFFFFF !important; 
-        border: 1px solid #1E1E1E !important; 
+    
+    /* Fix specifico per le icone e il testo dentro i bottoni Streamlit */
+    .stButton > button p {
+        color: #FFFFFF !important;
+        margin: 0 !important;
     }
 
-    /* Expander (La tendina della matita) */
+    .stButton > button:hover { 
+        background-color: #C0A062 !important; 
+        color: #1E1E1E !important; 
+    }
+    .stButton > button:hover p {
+        color: #1E1E1E !important;
+    }
+
+    /* EXPANDER / TENDINA MODIFICA (Fix Colore) */
     .streamlit-expanderHeader {
-        background-color: white;
-        color: #C0A062 !important;
-        font-weight: bold;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        background-color: #1E1E1E !important;
+        border: 1px solid #C0A062 !important;
+    }
+    .streamlit-expanderHeader span, .streamlit-expanderHeader p {
+        color: #FFFFFF !important; /* Scritta 'Gestisci' in bianco */
+    }
+    
+    /* Testi dentro la tendina */
+    [data-testid="stExpander"] label, [data-testid="stExpander"] p {
+        color: #2C2C2C !important; /* Etichette nere su fondo bianco della tendina */
     }
 
     /* BOX CONTATORE LEZIONI */
@@ -87,45 +85,22 @@ st.markdown("""
     .counter-box h2 {
         color: #FFFFFF !important; 
         margin: 0;
-        font-family: 'Helvetica Neue', sans-serif;
         font-size: 2.5rem;
     }
-    
-    /* Alert Recuperi */
-    .recovery-alert {
-        background-color: #FFF3E0;
-        border: 2px solid #E65100;
-        color: #E65100;
-        padding: 12px;
-        border-radius: 4px;
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 15px;
-    }
 
-    /* Card Storico e Admin */
+    /* Input Fields Fix */
+    div[data-baseweb="select"] * {
+        color: #FFFFFF !important; 
+    }
+    
+    /* Card Prenotazione */
     .booking-card { 
         background-color: white; 
         padding: 20px; 
         border-radius: 4px; 
         border-left: 5px solid #C0A062; 
-        margin-bottom: 5px; /* Ridotto margine inferiore per attaccare la tendina */
         box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-        color: #333;
-    }
-    .history-card { 
-        background-color: #F4F4F4; 
-        padding: 15px; 
-        border-radius: 2px; 
-        margin-bottom: 10px; 
-        border-left: 4px solid #999; 
-    }
-    .achievement-tag {
-        background-color: #C0A062;
-        color: white;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 0.8em;
+        color: #2C2C2C;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -153,7 +128,7 @@ def verify_user(u, p):
     res = supabase.table("users").select("*").eq("username", u).eq("password", hash_password(p)).execute()
     return res.data[0] if res.data else None
 def add_user(u, p, r):
-    try: supabase.table("users").insert({"username": u, "password": hash_password(p), "role": r}).execute(); return True
+    try: supabase.table("users").insert({"username": u, "password": hash_password(p), "role": r, "recovery_lessons": 0}).execute(); return True
     except: return False
 def identify_user_onesignal(username):
     try:
@@ -224,17 +199,6 @@ if not st.session_state['logged_in']:
                         cookie_manager.set("scuola_user_session", u, expires_at=datetime.now()+timedelta(days=30))
                         st.rerun()
                     else: st.error("Errore")
-        with t2:
-            with st.form("reg"):
-                nu = st.text_input("Nuovo User").strip()
-                np = st.text_input("Password", type='password').strip()
-                ia = st.checkbox("Sono Titolare"); ac = st.text_input("Codice Admin", type='password')
-                if st.form_submit_button("CREA ACCOUNT"):
-                    r = "admin" if ia and ac == ADMIN_KEY else "student"
-                    if ia and ac != ADMIN_KEY: st.error("Codice errato")
-                    elif nu and np:
-                        if add_user(nu, np, r): st.success("Fatto! Accedi.")
-                        else: st.error("Esiste già")
 
 # APP
 else:
@@ -242,11 +206,6 @@ else:
     with st.sidebar:
         if os.path.exists("sidebar.jpg"): st.image("sidebar.jpg", use_column_width=True)
         st.markdown(f"### 👤 {st.session_state['username'].upper()}")
-        if st.session_state['role'] == 'student':
-            me_sidebar = get_student_details(st.session_state['username'])
-            if me_sidebar and me_sidebar.get('recovery_lessons', 0) > 0:
-                st.markdown(f"<div style='background-color:#E65100; color:white; padding:10px; border-radius:4px; margin-top:10px; text-align:center;'>⚠️ <b>RECUPERI: {me_sidebar.get('recovery_lessons')}</b></div>", unsafe_allow_html=True)
-        st.markdown("---")
         if st.button("LOGOUT"): st.session_state['logged_in']=False; cookie_manager.delete("scuola_user_session"); st.rerun()
 
     if st.session_state['role'] == 'admin':
@@ -256,102 +215,56 @@ else:
             data = get_all_future_bookings_admin()
             if data:
                 for x in data:
-                    # SCHEDA VISIBILE
-                    st.markdown(f"""
-                    <div class='booking-card'>
-                        <span style='font-size:1.2em; font-weight:bold;'>👤 {x['username']}</span><br>
-                        📅 {x['booking_date']} | 🕒 {x['slot']} <br>
-                        Lezione attuale: <b>{x['lesson_number']}</b>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # TENDINA MODIFICA (Pencil Icon)
+                    st.markdown(f"<div class='booking-card'><b>👤 {x['username']}</b><br>📅 {x['booking_date']} | 🕒 {x['slot']} <br>Lezione: {x['lesson_number']}</div>", unsafe_allow_html=True)
                     with st.expander("✏️ Gestisci Prenotazione"):
-                        c1, c2 = st.columns([1, 1])
-                        with c1:
-                            new_num = st.number_input("Cambia Numero Lezione", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
-                            if st.button("💾 SALVA MODIFICHE", key=f"s_{x['id']}"):
-                                update_lesson_number(x['id'], new_num)
+                        new_n = st.number_input("Cambia Numero Lezione", min_value=1, value=x['lesson_number'], key=f"n_{x['id']}")
+                        c_b1, c_b2 = st.columns(2)
+                        with c_b1:
+                            if st.button("💾 SALVA MODIFICHE", key=f"s_{x['id']}"): 
+                                update_lesson_number(x['id'], new_n)
                                 st.rerun()
-                        with c2:
-                            st.write("") # Spaziatore
-                            st.write("")
-                            if st.button("🗑️ ELIMINA PRENOTAZIONE", key=f"d_{x['id']}"):
+                        with c_b2:
+                            if st.button("🗑️ ELIMINA", key=f"d_{x['id']}"): 
                                 delete_booking(x['id'])
                                 st.rerun()
             else: st.info("Nessuna prenotazione.")
 
         with tab_std:
-            st.subheader("Gestione Carriera")
+            st.subheader("Gestione Studente")
             students = [s['username'] for s in get_all_students()]
             sel_std = st.selectbox("Seleziona Studente:", [""] + students)
             if sel_std:
                 me = get_student_details(sel_std)
-                st.markdown("### 🟠 Gestione Recuperi")
-                cr = me.get('recovery_lessons', 0)
-                nr = st.number_input("Lezioni da recuperare", min_value=0, value=cr)
-                if st.button("AGGIORNA RECUPERI"):
-                    update_recovery_count(sel_std, nr)
-                    st.rerun()
+                st.markdown("### 🟠 Recuperi")
+                nr = st.number_input("Lezioni da recuperare", min_value=0, value=me.get('recovery_lessons', 0))
+                if st.button("AGGIORNA RECUPERI"): update_recovery_count(sel_std, nr); st.rerun()
+                
                 st.divider()
-                st.write("#### Storico & Assegnazione Obiettivi")
+                st.write("#### Storico & Premi")
                 past = get_past_bookings(sel_std)
                 if past:
                     for p in past:
-                        with st.container():
-                            curr_ach = p.get('achievement')
-                            st.markdown(f"<div class='history-card { 'special' if curr_ach else '' }'><b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} <b>{('🏆 ' + curr_ach) if curr_ach else ''}</b></div>", unsafe_allow_html=True)
-                            opts = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
-                            idx = opts.index(curr_ach) if curr_ach in opts else 0
-                            new_val = st.selectbox("Obiettivo raggiunto?", opts, index=idx, key=f"sel_{p['id']}")
-                            if st.button("SALVA PREMIO", key=f"btn_{p['id']}"):
-                                assign_achievement_to_lesson(p['id'], sel_std, (new_val if new_val != "Nessuno" else None))
-                                st.rerun()
+                        curr_ach = p.get('achievement')
+                        st.info(f"📅 {p['booking_date']} | Lez. {p['lesson_number']} {('🏆 ' + curr_ach) if curr_ach else ''}")
+                        opts = ["Nessuno"] + list(ACHIEVEMENTS_MAP.keys())
+                        idx = opts.index(curr_ach) if curr_ach in opts else 0
+                        new_v = st.selectbox("Premio?", opts, index=idx, key=f"sel_{p['id']}")
+                        if st.button("CONFERMA", key=f"btn_{p['id']}"): 
+                            assign_achievement_to_lesson(p['id'], sel_std, (new_v if new_v != "Nessuno" else None))
+                            st.rerun()
 
     else:
+        # VISTA STUDENTE
         tab_agen, tab_carr = st.tabs(["AGENDA", "CARRIERA"])
         with tab_agen:
             me = get_student_details(st.session_state['username'])
             rec = me.get('recovery_lessons', 0)
-            if rec > 0: st.markdown(f"<div class='recovery-alert'>⚠️ HAI {rec} LEZIONI DA RECUPERARE</div>", unsafe_allow_html=True)
+            if rec > 0: st.warning(f"HAI {rec} LEZIONI DA RECUPERARE")
             nxt = calculate_next_lesson_number(st.session_state['username'])
             st.markdown(f"<div class='counter-box'><h2>LEZIONE {nxt} / 8</h2></div>", unsafe_allow_html=True)
             with st.form("new_bk"):
-                c1, c2 = st.columns(2)
-                d = c1.date_input("Data", min_value=date.today())
-                s = c2.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
+                d = st.date_input("Data", min_value=date.today())
+                s = st.selectbox("Orario", ["10:00 - 13:00", "15:00 - 18:00"])
                 if st.form_submit_button("PRENOTA"):
                     if d.weekday() in [0, 6]: st.error("Chiuso Lun/Dom")
-                    else:
-                        ok, m = add_booking(st.session_state['username'], d, s)
-                        if ok: st.rerun()
-                        else: st.warning(m)
-            st.write("### Future")
-            fut = get_future_bookings(st.session_state['username'])
-            for x in fut:
-                st.markdown(f"<div class='booking-card'>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
-                if st.button("ANNULLA", key=x['id']): delete_booking(x['id']); st.rerun()
-
-        with tab_carr:
-            me = get_student_details(st.session_state['username'])
-            def show_badge(col, title, active, icon, rank_class):
-                stt = "ach-unlocked" if active else "ach-locked"
-                ico = icon if active else "🔒"
-                col.markdown(f"<div class='ach-box {rank_class} {stt}'><span class='ach-icon'>{ico}</span><span class='ach-title'>{title}</span></div>", unsafe_allow_html=True)
-            st.write("🥉 **ELEMENTI BASE**")
-            b1, b2, b3 = st.columns(3)
-            show_badge(b1, "Rosetta", me.get('ach_rosetta'), "🏵️", "rank-bronze")
-            show_badge(b2, "Ponte", me.get('ach_ponte'), "🌉", "rank-bronze")
-            show_badge(b3, "Assemblaggio", me.get('ach_assemblata'), "🔧", "rank-bronze")
-            st.write("🥇 **STRUTTURA**")
-            g1, g2 = st.columns(2)
-            show_badge(g1, "Manico", me.get('ach_manico'), "🪵", "rank-gold")
-            show_badge(g2, "Corpo", me.get('ach_corpo'), "🎸", "rank-gold")
-            st.write("💎 **MAESTRO**")
-            p1 = st.columns(1)[0]; show_badge(p1, "Chitarra Finita", me.get('ach_finita'), "🏆", "rank-platinum")
-            st.divider()
-            st.subheader("Il tuo Percorso")
-            past = get_past_bookings(st.session_state['username'])
-            for p in past:
-                ach = p.get('achievement')
-                st.markdown(f"<div class='history-card { 'special' if ach else '' }'>✅ <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} {('<span class=\"achievement-tag\">🏆 '+ach+'</span>') if ach else ''}</div>", unsafe_allow_html=True)
+                    else: add_booking(st.session_state['username'], d, s); st.rerun()
