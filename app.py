@@ -9,7 +9,7 @@ from datetime import datetime, date, timedelta
 from supabase import create_client, Client
 import os
 
-# --- 1. CONFIGURAZIONE PAGINA & CSS "ULTRA CONTRASTO" ---
+# --- 1. CONFIGURAZIONE PAGINA & CSS "ULTRA LEGGIBILITÀ" ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
 st.markdown("""
@@ -17,63 +17,56 @@ st.markdown("""
     /* Sfondo Generale */
     .stApp { background-color: #FAF9F6; }
     
-    /* Font e Testi Base */
+    /* Font Base */
     h1, h2, h3, h4, p, span, label, div { 
-        color: #2C2C2C; 
         font-family: 'Georgia', serif; 
     }
 
-    /* Sidebar */
-    [data-testid="stSidebar"] { 
+    /* --- FIX TOTALE BOTTONI --- */
+    /* Colpiamo il bottone, il testo al suo interno (p) e l'icona (svg) */
+    .stButton > button, 
+    .stButton > button p, 
+    .stButton > button div, 
+    .stButton > button svg { 
         background-color: #1E1E1E !important; 
-        border-right: 1px solid #C0A062; 
+        color: #FFFFFF !important; 
+        fill: #FFFFFF !important; /* Per le icone SVG */
     }
-    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* BOTTONI GENERALI E ADMIN (Fix Scritte Nere) */
-    .stButton > button { 
-        background-color: #1E1E1E !important; 
-        color: #FFFFFF !important; /* FORZA BIANCO */
-        border-radius: 4px !important; 
-        width: 100%; 
-        font-weight: bold !important; 
-        text-transform: uppercase; 
-        border: 1px solid #C0A062 !important; 
+    .stButton > button {
+        border: 1px solid #C0A062 !important;
+        border-radius: 4px !important;
         height: 3.5em !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    
-    /* Fix specifico per le icone e il testo dentro i bottoni Streamlit */
-    .stButton > button p {
-        color: #FFFFFF !important;
-        margin: 0 !important;
+        width: 100% !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
     }
 
-    .stButton > button:hover { 
-        background-color: #C0A062 !important; 
-        color: #1E1E1E !important; 
+    .stButton > button:hover {
+        background-color: #C0A062 !important;
     }
-    .stButton > button:hover p {
+    .stButton > button:hover p, .stButton > button:hover svg {
         color: #1E1E1E !important;
+        fill: #1E1E1E !important;
     }
 
-    /* EXPANDER / TENDINA MODIFICA (Fix Colore) */
+    /* --- FIX TOTALE TENDINA (EXPANDER) --- */
+    /* Header della tendina */
     .streamlit-expanderHeader {
         background-color: #1E1E1E !important;
         border: 1px solid #C0A062 !important;
-    }
-    .streamlit-expanderHeader span, .streamlit-expanderHeader p {
-        color: #FFFFFF !important; /* Scritta 'Gestisci' in bianco */
+        border-radius: 4px !important;
     }
     
-    /* Testi dentro la tendina */
-    [data-testid="stExpander"] label, [data-testid="stExpander"] p {
-        color: #2C2C2C !important; /* Etichette nere su fondo bianco della tendina */
+    /* Testo e icona della tendina (la freccetta) */
+    .streamlit-expanderHeader p, 
+    .streamlit-expanderHeader span, 
+    .streamlit-expanderHeader svg {
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
     }
 
-    /* BOX CONTATORE LEZIONI */
+    /* --- FIX BOX CONTATORE LEZIONI --- */
     .counter-box {
         background-color: #1E1E1E; 
         padding: 30px; 
@@ -84,15 +77,25 @@ st.markdown("""
     }
     .counter-box h2 {
         color: #FFFFFF !important; 
-        margin: 0;
-        font-size: 2.5rem;
+        margin: 0 !important;
+        font-size: 2.5rem !important;
     }
 
-    /* Input Fields Fix */
+    /* --- SIDEBAR --- */
+    [data-testid="stSidebar"] { background-color: #1E1E1E !important; }
+    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
+
+    /* --- INPUT E SELECTBOX --- */
+    /* Testo dentro le selectbox (menu a tendina) */
     div[data-baseweb="select"] * {
-        color: #FFFFFF !important; 
+        color: #FFFFFF !important;
     }
-    
+    /* Etichette degli input (Giorno, Orario, ecc.) */
+    .stTextInput label, .stDateInput label, .stSelectbox label, .stNumberInput label {
+        color: #2C2C2C !important;
+        font-weight: bold !important;
+    }
+
     /* Card Prenotazione */
     .booking-card { 
         background-color: white; 
@@ -100,12 +103,12 @@ st.markdown("""
         border-radius: 4px; 
         border-left: 5px solid #C0A062; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-        color: #2C2C2C;
+        color: #2C2C2C !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. BACKEND ---
+# --- 2. BACKEND (Invariato) ---
 try: ADMIN_KEY = st.secrets["admin_password"]
 except: st.error("Errore Secrets."); st.stop()
 
@@ -122,7 +125,6 @@ ACHIEVEMENTS_MAP = {
     "Manico 🪵": "ach_manico", "Corpo 🎸": "ach_corpo", "Chitarra Finita 🏆": "ach_finita"
 }
 
-# --- FUNZIONI ---
 def hash_password(p): return hashlib.sha256(str.encode(p)).hexdigest()
 def verify_user(u, p):
     res = supabase.table("users").select("*").eq("username", u).eq("password", hash_password(p)).execute()
