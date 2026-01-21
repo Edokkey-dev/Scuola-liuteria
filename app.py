@@ -1,14 +1,3 @@
-Hai perfettamente ragione. Avere tutti quei bottoni e caselle sempre visibili crea confusione e "sporca" il design del registro.
-
-Ho ridisegnato la sezione **Registro (Admin)** seguendo la tua richiesta:
-
-1. **Pulizia:** Ora vedi solo la Card con il nome e l'orario.
-2. **L'icona Matita:** Sotto ogni card c'è un menu a tendina (Expander) con scritto **"✏️ Modifica"**.
-3. **Il Pannello Nascosto:** Cliccando sulla matita, si apre il pannello dove puoi modificare il numero della lezione o eliminarla.
-
-Ecco il codice completo aggiornato. Sostituisci tutto in `app.py`.
-
-```python
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -366,5 +355,3 @@ else:
             for p in past:
                 ach = p.get('achievement')
                 st.markdown(f"<div class='history-card { 'special' if ach else '' }'>✅ <b>{p['booking_date']}</b> (Lez. {p['lesson_number']})<br>{p['slot']} {('<span class=\"achievement-tag\">🏆 '+ach+'</span>') if ach else ''}</div>", unsafe_allow_html=True)
-
-```
