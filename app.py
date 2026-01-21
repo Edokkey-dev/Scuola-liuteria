@@ -12,7 +12,7 @@ import os
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Accademia Liuteria San Barnaba", page_icon="🎻", layout="centered")
 
-# --- 2. CSS DEFINITIVO (Bottoni Leggibili + Box Carriera Ripristinati) ---
+# --- 2. CSS DARK GREY & WHITE (Alto Contrasto) ---
 st.markdown("""
 <style>
     /* Sfondo Generale */
@@ -27,11 +27,11 @@ st.markdown("""
     /* --- SIDEBAR --- */
     [data-testid="stSidebar"] { 
         background-color: #1E1E1E !important; 
-        border-right: 1px solid #C0A062; 
+        border-right: 1px solid #444; 
     }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* --- BOTTONI (Grigio Scuro con Scritta BIANCA FORZATA) --- */
+    /* --- BOTTONI (Grigio Scuro con Scritta BIANCA) --- */
     .stButton > button { 
         background-color: #1E1E1E !important; 
         color: #FFFFFF !important; 
@@ -42,20 +42,16 @@ st.markdown("""
         font-weight: bold !important; 
         text-transform: uppercase !important;
     }
-    /* Forza il colore del testo BIANCO dentro i bottoni (per icone e paragrafi) */
+    /* Forza testo bianco nei bottoni */
     .stButton > button p, .stButton > button span, .stButton > button div {
         color: #FFFFFF !important;
     }
-    /* Hover Bottoni */
     .stButton > button:hover { 
-        background-color: #C0A062 !important; 
-        border-color: #1E1E1E !important;
-    }
-    .stButton > button:hover p {
-        color: #1E1E1E !important;
+        background-color: #333333 !important; 
+        border-color: #FFFFFF !important;
     }
 
-    /* --- EXPANDER / TENDINA (Grigio Scuro) --- */
+    /* --- EXPANDER / TENDINA --- */
     .streamlit-expanderHeader {
         background-color: #1E1E1E !important;
         border: 1px solid #555 !important;
@@ -74,7 +70,7 @@ st.markdown("""
         border: 1px solid #ccc !important;
     }
     div[data-baseweb="select"] * { color: #FFFFFF !important; } 
-    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label, .stCheckbox label {
         color: #2C2C2C !important;
         font-weight: bold !important;
     }
@@ -94,7 +90,7 @@ st.markdown("""
         font-size: 2.5rem !important;
     }
 
-    /* --- CARDS (Agenda e Storico) --- */
+    /* --- CARDS --- */
     .booking-card { 
         background-color: white; 
         padding: 20px; 
@@ -130,7 +126,16 @@ st.markdown("""
         font-size: 1.2rem;
     }
     
-    /* --- BOX MEDAGLIE CARRIERA (RIPRISTINATO) --- */
+    /* Login Box */
+    [data-testid="stForm"] { 
+        background-color: #FFFFFF; 
+        padding: 40px; 
+        border-radius: 4px; 
+        border-top: 5px solid #1E1E1E; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+    }
+    
+    /* Badge Carriera (Box) */
     .ach-box { 
         background-color: #FFFFFF; 
         border-radius: 6px; 
@@ -142,26 +147,16 @@ st.markdown("""
     }
     .ach-icon { font-size: 2rem; display: block; margin-bottom: 5px; }
     .ach-title { font-size: 0.9rem; font-weight: bold; text-transform: uppercase; color: #2C2C2C; }
-    
     .rank-bronze { border-bottom: 4px solid #CD7F32; }
     .rank-gold { border-bottom: 4px solid #FFD700; }
     .rank-platinum { border-bottom: 4px solid #E5E4E2; background: linear-gradient(to bottom right, #fff, #f0f0f0); }
-
     .ach-locked { opacity: 0.4; filter: grayscale(100%); }
     .ach-unlocked { opacity: 1; }
-    
-    /* Login Box */
-    [data-testid="stForm"] { 
-        background-color: #FFFFFF; 
-        padding: 40px; 
-        border-radius: 4px; 
-        border-top: 5px solid #1E1E1E; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
-    }
+
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. BACKEND & SUPABASE ---
+# --- 3. BACKEND ---
 try: ADMIN_KEY = st.secrets["admin_password"]
 except: st.error("Errore Secrets."); st.stop()
 
@@ -178,7 +173,7 @@ ACHIEVEMENTS_MAP = {
     "Manico 🪵": "ach_manico", "Corpo 🎸": "ach_corpo", "Chitarra Finita 🏆": "ach_finita"
 }
 
-# --- FUNZIONI LOGICHE ---
+# --- FUNZIONI ---
 def hash_password(p): return hashlib.sha256(str.encode(p)).hexdigest()
 def verify_user(u, p):
     res = supabase.table("users").select("*").eq("username", u).eq("password", hash_password(p)).execute()
@@ -248,11 +243,19 @@ if not st.session_state['logged_in']:
             with st.form("log"):
                 u = st.text_input("Username").strip()
                 p = st.text_input("Password", type='password').strip()
+                
+                # --- FUNZIONE RICORDAMI REINSERITA ---
+                rem = st.checkbox("Ricordami")
+                
                 if st.form_submit_button("ENTRA"):
                     ud = verify_user(u, p)
                     if ud:
                         st.session_state.update({'logged_in':True, 'username':u, 'role':ud['role']})
-                        cookie_manager.set("scuola_user_session", u, expires_at=datetime.now()+timedelta(days=30))
+                        
+                        # Se la spunta è attiva, salva il cookie
+                        if rem:
+                            cookie_manager.set("scuola_user_session", u, expires_at=datetime.now()+timedelta(days=30))
+                        
                         st.rerun()
                     else: st.error("Dati errati")
         with t2:
@@ -368,14 +371,13 @@ else:
                 st.markdown(f"<div class='booking-card'>📅 {x['booking_date']} | 🕒 {x['slot']}</div>", unsafe_allow_html=True)
                 if st.button("ANNULLA", key=x['id']): delete_booking(x['id']); st.rerun()
 
-        # 2. Carriera (Layout Ripristinato a Box)
+        # 2. Carriera
         with tab_carr:
             me = get_student_details(st.session_state['username'])
             
             def show_badge(col, title, active, icon, rank_class):
                 stt = "ach-unlocked" if active else "ach-locked"
                 ico = icon if active else "🔒"
-                # Qui usiamo la classe CSS .ach-box definita sopra per ricreare i riquadri
                 col.markdown(f"""
                 <div class='ach-box {rank_class} {stt}'>
                     <span class='ach-icon'>{ico}</span>
