@@ -74,6 +74,21 @@ st.markdown("""
         font-weight: bold !important;
     }
 
+    /* --- FIX MENU A TENDINA (Dropdown Opzioni) --- */
+    ul[role="listbox"], div[data-baseweb="popover"] {
+        background-color: #1E1E1E !important;
+    }
+    ul[role="listbox"] li {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
+    }
+    ul[role="listbox"] li span {
+        color: #FFFFFF !important;
+    }
+    ul[role="listbox"] li:hover {
+        background-color: #444444 !important;
+    }
+
     /* --- BOX CONTATORE LEZIONI --- */
     .counter-box {
         background-color: #1E1E1E; 
