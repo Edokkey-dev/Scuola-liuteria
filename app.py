@@ -190,13 +190,18 @@ def identify_user_onesignal(username):
     except: pass
 
 def calculate_next_lesson_number(u):
-    today = date.today().isoformat()
-    # Logica: se c'è una lezione futura, usa quel numero. Altrimenti prendi ultima passata + 1.
-    future = supabase.table("bookings").select("lesson_number").eq("username", u).gte("booking_date", today).order("booking_date").limit(1).execute()
-    if future.data: return future.data[0]['lesson_number']
+    # Cerca l'ultima prenotazione in assoluto (ordinando per data e slot decrescenti)
+    latest = supabase.table("bookings") \
+        .select("lesson_number") \
+        .eq("username", u) \
+        .order("booking_date", desc=True) \
+        .order("slot", desc=True) \
+        .limit(1) \
+        .execute()
     
-    past = supabase.table("bookings").select("lesson_number").eq("username", u).lt("booking_date", today).order("booking_date", desc=True).limit(1).execute()
-    if past.data: return (past.data[0]['lesson_number'] % 8) + 1
+    if latest.data: 
+        return (latest.data[0]['lesson_number'] % 8) + 1
+    
     return 1
 
 def add_booking(u, d, s):
@@ -213,7 +218,6 @@ def get_future_bookings(u):
 
 def get_past_bookings(u):
     today = date.today().isoformat()
-    # MODIFICA: Include anche le lezioni di OGGI (lte invece di lt) così appaiono subito dopo
     return supabase.table("bookings").select("*").eq("username", u).lte("booking_date", today).order("booking_date", desc=True).execute().data
 
 def get_all_future_bookings_admin():
