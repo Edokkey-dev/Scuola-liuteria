@@ -74,18 +74,21 @@ st.markdown("""
         font-weight: bold !important;
     }
 
-    /* --- FIX MENU A TENDINA (Dropdown Opzioni) --- */
-    ul[role="listbox"], div[data-baseweb="popover"] {
+    /* --- SUPER FIX MENU A TENDINA --- */
+    div[data-baseweb="popover"] {
         background-color: #1E1E1E !important;
     }
-    ul[role="listbox"] li {
+    /* Forza TUTTO quello che c'è dentro la tendina ad essere bianco */
+    div[data-baseweb="popover"] * {
+        color: #FFFFFF !important;
+    }
+    div[data-baseweb="popover"] ul, 
+    div[data-baseweb="popover"] li {
         background-color: #1E1E1E !important;
-        color: #FFFFFF !important;
     }
-    ul[role="listbox"] li span {
-        color: #FFFFFF !important;
-    }
-    ul[role="listbox"] li:hover {
+    /* Effetto Hover quando passi il mouse */
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] li:hover * {
         background-color: #444444 !important;
     }
 
